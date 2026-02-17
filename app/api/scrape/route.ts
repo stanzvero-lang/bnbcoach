@@ -4,6 +4,13 @@ import { scrapeAirbnbListing } from "@/lib/apify";
 
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.APIFY_API_TOKEN) {
+      return NextResponse.json(
+        { error: "Scraping non ancora configurato. Configura APIFY_API_TOKEN nelle variabili d'ambiente." },
+        { status: 503 }
+      );
+    }
+
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

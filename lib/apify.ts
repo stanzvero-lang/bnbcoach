@@ -1,4 +1,3 @@
-const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN;
 const ACTOR_ID = "dtrungtin/airbnb-scraper";
 
 interface ApifyRunResponse {
@@ -10,8 +9,13 @@ interface ApifyRunResponse {
 }
 
 export async function scrapeAirbnbListing(url: string) {
+  const token = process.env.APIFY_API_TOKEN;
+  if (!token) {
+    return null;
+  }
+
   const response = await fetch(
-    `https://api.apify.com/v2/acts/${ACTOR_ID}/runs?token=${APIFY_API_TOKEN}`,
+    `https://api.apify.com/v2/acts/${ACTOR_ID}/runs?token=${token}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,7 +38,7 @@ export async function scrapeAirbnbListing(url: string) {
   while (status === "RUNNING" || status === "READY") {
     await new Promise((resolve) => setTimeout(resolve, 5000));
     const statusRes = await fetch(
-      `https://api.apify.com/v2/actor-runs/${run.data.id}?token=${APIFY_API_TOKEN}`
+      `https://api.apify.com/v2/actor-runs/${run.data.id}?token=${token}`
     );
     const statusData = await statusRes.json();
     status = statusData.data.status;
@@ -42,7 +46,7 @@ export async function scrapeAirbnbListing(url: string) {
 
   // Fetch results
   const datasetRes = await fetch(
-    `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_TOKEN}`
+    `https://api.apify.com/v2/datasets/${datasetId}/items?token=${token}`
   );
   const items = await datasetRes.json();
 

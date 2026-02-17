@@ -1,15 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-// Use service role key for webhooks (no user context)
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+const NOT_CONFIGURED = NextResponse.json(
+  { error: "Webhook non ancora configurato. Configura le API key di Stripe nelle variabili d'ambiente." },
+  { status: 503 }
 );
 
 export async function POST(request: NextRequest) {
+  const stripe = getStripe();
+  if (!stripe || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return NOT_CONFIGURED;
+  }
+
+  // Use service role key for webhooks (no user context)
+  const supabaseAdmin = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+
   const body = await request.text();
   const sig = request.headers.get("stripe-signature")!;
 

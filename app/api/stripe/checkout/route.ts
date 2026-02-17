@@ -1,9 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { stripe } from "@/lib/stripe";
+import { getStripe } from "@/lib/stripe";
+
+const NOT_CONFIGURED = NextResponse.json(
+  { error: "Pagamenti non ancora configurati. Configura le API key di Stripe nelle variabili d'ambiente." },
+  { status: 503 }
+);
 
 export async function POST(request: NextRequest) {
   try {
+    const stripe = getStripe();
+    if (!stripe) return NOT_CONFIGURED;
+
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
