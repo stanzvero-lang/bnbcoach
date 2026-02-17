@@ -1,230 +1,442 @@
 import { type ListingData } from "./mock-listing";
 
-// Fetch an Airbnb listing page and extract data from embedded JSON-LD
-// and meta tags. No external API dependencies required.
+// Public API key used by Airbnb's own frontend
+const AIRBNB_API_KEY = "d306zoyjsyarp7ifhu67rjxn52tv0t20";
+
+const BROWSER_HEADERS = {
+  "User-Agent":
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
+  Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+};
+
+/**
+ * Scrape an Airbnb listing by room ID extracted from the URL.
+ *
+ * Strategy:
+ * 1. Fetch the listing HTML page and parse the embedded deferred state JSON
+ *    (this contains the full PDP sections API response pre-rendered by Airbnb SSR)
+ * 2. Fallback: call the v2 REST API endpoint /api/v2/pdp_listing_details
+ */
 export async function scrapeAirbnbListing(url: string): Promise<ListingData | null> {
-  const html = await fetchListingHTML(url);
-  if (!html) return null;
-
-  const jsonLd = extractJsonLd(html);
-  const meta = extractMetaTags(html);
-  const extraData = extractInlineData(html);
-
-  if (!jsonLd && !meta.title) {
-    console.error("Scraper: no JSON-LD or meta data found in page");
+  const roomId = extractRoomId(url);
+  if (!roomId) {
+    console.error("Scraper: could not extract room ID from URL:", url);
     return null;
   }
 
-  // JSON-LD for Airbnb listings uses schema.org types:
-  // @type: "Product", "LodgingBusiness", "SingleFamilyResidence", "Accommodation", etc.
-  // Fields: name, description, image, aggregateRating, address, etc.
-  const images: string[] = jsonLd?.image
-    ? (Array.isArray(jsonLd.image) ? jsonLd.image : [jsonLd.image])
-    : [];
+  // Strategy 1: fetch HTML and parse deferred state
+  const htmlData = await scrapeFromHTML(roomId);
+  if (htmlData) return htmlData;
 
-  const rating = jsonLd?.aggregateRating;
+  // Strategy 2: v2 REST API
+  const apiData = await scrapeFromV2Api(roomId);
+  if (apiData) return apiData;
 
-  return {
-    url,
-    title: jsonLd?.name || meta.title || "",
-    description: jsonLd?.description || meta.description || "",
-    photoCount: images.length || extraData.photoCount || 0,
-    photoCaptions: images.map(() => ""), // JSON-LD doesn't include captions
-    amenities: extraData.amenities || [],
-    price: {
-      amount: extractPrice(jsonLd, meta) || 0,
-      currency: "EUR",
-      period: "notte",
-    },
-    rating: rating?.ratingValue ? parseFloat(rating.ratingValue) : 0,
-    reviewCount: rating?.reviewCount ? parseInt(rating.reviewCount, 10) : 0,
-    reviewSample: [], // Reviews not available from HTML scrape
-    propertyType: jsonLd?.["@type"] || extraData.propertyType || "",
-    location: {
-      city: jsonLd?.address?.addressLocality || extraData.city || "",
-      area: jsonLd?.address?.addressRegion || "",
-      country: jsonLd?.address?.addressCountry || "Italia",
-    },
-    host: {
-      name: extraData.hostName || "",
-      superhost: extraData.isSuperhost || false,
-      responseRate: "N/A",
-    },
-    guests: extraData.guests || 0,
-    bedrooms: extraData.bedrooms || 0,
-    beds: extraData.beds || 0,
-    bathrooms: extraData.bathrooms || 0,
-  };
+  console.error("Scraper: all strategies failed for room", roomId);
+  return null;
 }
 
-async function fetchListingHTML(url: string): Promise<string | null> {
+/**
+ * Extract the numeric room ID from various Airbnb URL formats:
+ * - https://www.airbnb.com/rooms/12345678
+ * - https://www.airbnb.it/rooms/12345678?check_in=...
+ * - https://airbnb.com/rooms/12345678/...
+ * - https://www.airbnb.co.uk/rooms/plus/12345678
+ */
+export function extractRoomId(url: string): string | null {
+  const match = url.match(/airbnb\.[a-z.]+\/rooms\/(?:plus\/)?(\d+)/);
+  return match ? match[1] : null;
+}
+
+// ---------------------------------------------------------------------------
+// Strategy 1: Parse deferred state from listing HTML
+// ---------------------------------------------------------------------------
+
+async function scrapeFromHTML(roomId: string): Promise<ListingData | null> {
   try {
-    const response = await fetch(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-        "Accept-Language": "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.7",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      },
+    const listingUrl = `https://www.airbnb.com/rooms/${roomId}`;
+    const response = await fetch(listingUrl, {
+      headers: BROWSER_HEADERS,
       redirect: "follow",
     });
 
     if (!response.ok) {
-      console.error(`Scraper fetch failed [${response.status}] for ${url}`);
+      console.error(`Scraper HTML fetch failed [${response.status}] for room ${roomId}`);
       return null;
     }
 
-    return await response.text();
+    const html = await response.text();
+
+    // Airbnb embeds the full PDP data in a <script id="data-deferred-state-0"> tag
+    // containing a JSON blob with niobeClientData -> the StaysPdpSections response.
+    const deferredMatch = html.match(
+      /<script\s+id="data-deferred-state-0"[^>]*>([\s\S]*?)<\/script>/
+    );
+
+    if (!deferredMatch) {
+      console.error("Scraper: no deferred state found in HTML");
+      return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let deferred: any;
+    try {
+      deferred = JSON.parse(deferredMatch[1]);
+    } catch {
+      console.error("Scraper: failed to parse deferred state JSON");
+      return null;
+    }
+
+    return parseDeferredState(deferred, roomId);
   } catch (err) {
-    console.error("Scraper fetch error:", err);
+    console.error("Scraper HTML strategy error:", err);
     return null;
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractJsonLd(html: string): any | null {
-  // Match all JSON-LD script blocks
-  const regex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
-  let match;
-  while ((match = regex.exec(html)) !== null) {
-    try {
-      const data = JSON.parse(match[1]);
-      // Airbnb may embed an array or a single object
-      const obj = Array.isArray(data) ? data[0] : data;
-      // Accept any schema.org type that looks like a listing
-      if (obj?.name || obj?.description) {
-        return obj;
-      }
-    } catch {
-      // Malformed JSON-LD block, try next one
-    }
-  }
-  return null;
-}
-
-function extractMetaTags(html: string): { title: string; description: string; price: string } {
-  const getContent = (nameOrProp: string): string => {
-    const re = new RegExp(
-      `<meta[^>]*(?:name|property)=["']${nameOrProp}["'][^>]*content=["']([^"']*)["']`,
-      "i"
-    );
-    const m = html.match(re);
-    if (m) return m[1];
-    // Also try reversed attribute order: content before name/property
-    const re2 = new RegExp(
-      `<meta[^>]*content=["']([^"']*)["'][^>]*(?:name|property)=["']${nameOrProp}["']`,
-      "i"
-    );
-    const m2 = html.match(re2);
-    return m2 ? m2[1] : "";
-  };
-
-  return {
-    title: getContent("og:title") || getContent("twitter:title") || extractHtmlTitle(html),
-    description: getContent("og:description") || getContent("description") || "",
-    price: getContent("og:price:amount") || "",
-  };
-}
-
-function extractHtmlTitle(html: string): string {
-  const m = html.match(/<title[^>]*>([^<]*)<\/title>/i);
-  return m ? m[1].trim() : "";
-}
-
-interface InlineData {
-  amenities: string[];
-  propertyType: string;
-  city: string;
-  hostName: string;
-  isSuperhost: boolean;
-  guests: number;
-  bedrooms: number;
-  beds: number;
-  bathrooms: number;
-  photoCount: number;
-}
-
-function extractInlineData(html: string): InlineData {
-  const result: InlineData = {
-    amenities: [],
-    propertyType: "",
-    city: "",
-    hostName: "",
-    isSuperhost: false,
-    guests: 0,
-    bedrooms: 0,
-    beds: 0,
-    bathrooms: 0,
-    photoCount: 0,
-  };
-
-  // Airbnb pages embed a large JSON blob in a <script> tag with data-deferred-state
-  // or inside __NEXT_DATA__ or in a bootstrapData/redux-like structure.
-  // Try to extract key data from these inline scripts.
+function parseDeferredState(deferred: any, roomId: string): ListingData | null {
   try {
-    // Count photo URLs (Airbnb uses a.muscache.com or images from their CDN)
-    const photoMatches = html.match(/https:\/\/a0\.muscache\.com\/im\/pictures\/[^"'\s]+/g);
-    if (photoMatches) {
-      // Deduplicate
-      result.photoCount = new Set(photoMatches).size;
+    // Navigate to the sections data. The structure is:
+    // niobeMinimalClientData -> [array of [key, value]] pairs
+    // One of them contains the StaysPdpSections response.
+    const clientData =
+      deferred?.niobeMinimalClientData || deferred?.niobeClientData;
+    if (!Array.isArray(clientData)) {
+      console.error("Scraper: no niobeClientData found in deferred state");
+      return null;
     }
 
-    // Try extracting structured data from Airbnb's internal state
-    // Pattern: "pdp_listing_detail" or "listingTitle" etc. in embedded JSON
-    const superhostMatch = html.match(/[Ss]uperhost|superhost":true/);
-    if (superhostMatch) result.isSuperhost = true;
-
-    // Extract capacity numbers from text like "4 ospiti · 2 camere · 2 letti · 1 bagno"
-    // or English "4 guests · 2 bedrooms · 2 beds · 1 bath"
-    const capacityMatch = html.match(
-      /(\d+)\s*(?:ospiti|guests?)[\s·]+(\d+)\s*(?:camer[ae]|bedrooms?)[\s·]+(\d+)\s*(?:lett[io]|beds?)[\s·]+(\d+)\s*(?:bagn[io]|bath)/i
-    );
-    if (capacityMatch) {
-      result.guests = parseInt(capacityMatch[1], 10);
-      result.bedrooms = parseInt(capacityMatch[2], 10);
-      result.beds = parseInt(capacityMatch[3], 10);
-      result.bathrooms = parseInt(capacityMatch[4], 10);
+    // Find the PDP entry - it's an array of [queryKey, responseData] pairs
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let pdpData: any = null;
+    for (const entry of clientData) {
+      if (!Array.isArray(entry) || entry.length < 2) continue;
+      const key = typeof entry[0] === "string" ? entry[0] : JSON.stringify(entry[0]);
+      if (key.includes("StaysPdpSections") || key.includes("PdpPlatformSections")) {
+        pdpData = entry[1];
+        break;
+      }
     }
 
-    // Try to find host name: "Hosted by <Name>" or "Host: <Name>"
-    const hostMatch = html.match(
-      /(?:Hosted by|Ospitato da|Host[:\s]+)[\s]*([A-ZÀ-Ú][a-zà-ú]+)/
-    );
-    if (hostMatch) result.hostName = hostMatch[1];
+    if (!pdpData) {
+      console.error("Scraper: no StaysPdpSections data in niobeClientData");
+      return null;
+    }
 
-    // Try to extract amenities from the page
-    // Airbnb lists amenities as text items, often in a section
-    const amenityPatterns = [
-      /aria-label="([^"]+)"\s*class="[^"]*amenity/gi,
-      /"amenity[^"]*"[^>]*>([^<]+)</gi,
-    ];
-    for (const pattern of amenityPatterns) {
-      let am;
-      while ((am = pattern.exec(html)) !== null) {
-        if (am[1] && am[1].length < 50) {
-          result.amenities.push(am[1].trim());
+    // Navigate to sections
+    const presentation = pdpData?.data?.presentation;
+    const stayPage =
+      presentation?.stayProductDetailPage || presentation?.stayProductDetailPageV2;
+    const sectionsContainer = stayPage?.sections;
+
+    if (!sectionsContainer) {
+      console.error("Scraper: no sections container found");
+      return null;
+    }
+
+    // Extract metadata (rating, review count, capacity, etc.)
+    const metadata = sectionsContainer?.metadata;
+    const logging = metadata?.loggingContext?.eventDataLogging;
+    const sbuiSections =
+      sectionsContainer?.sbuiData?.sectionConfiguration?.root?.sections || [];
+    const sections = sectionsContainer?.sections || [];
+
+    // Extract data from typed sections
+    let title = "";
+    let description = "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const photos: { url: string; caption: string }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const amenities: string[] = [];
+    let hostName = "";
+    let isSuperhost = false;
+    let roomType = "";
+    let guests = 0;
+    let bedrooms = 0;
+    let beds = 0;
+    let bathrooms = 0;
+
+    // Parse SBUI sections (overview with capacity)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const s of sbuiSections) {
+      const data = s?.sectionData || s?.section;
+      if (!data?.__typename) continue;
+
+      if (data.__typename === "PdpOverviewV2Section" || data.__typename.includes("Overview")) {
+        roomType = data.title || "";
+        // overviewItems: [{title: "2 guests"}, {title: "1 bedroom"}, ...]
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const item of data.overviewItems || []) {
+          const t = item.title || "";
+          const num = parseInt(t, 10);
+          if (isNaN(num)) continue;
+          const lower = t.toLowerCase();
+          if (lower.includes("guest") || lower.includes("ospit")) guests = num;
+          else if (lower.includes("bedroom") || lower.includes("camer")) bedrooms = num;
+          else if (lower.includes("bed") || lower.includes("lett")) beds = num;
+          else if (lower.includes("bath") || lower.includes("bagn")) bathrooms = num;
         }
       }
     }
-  } catch (err) {
-    console.error("Scraper inline data extraction error:", err);
-  }
 
-  return result;
+    // Parse main sections
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const s of sections) {
+      const section = s?.section;
+      if (!section?.__typename) continue;
+
+      switch (section.__typename) {
+        case "PdpTitleSection":
+          title = section.title || "";
+          break;
+
+        case "PdpDescriptionSection": {
+          const htmlDesc =
+            section.htmlDescription?.htmlText || section.description || "";
+          // Strip HTML tags
+          description = htmlDesc.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+          break;
+        }
+
+        case "PhotoTourModalSection":
+        case "PdpPhotoTourSection":
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const item of section.mediaItems || []) {
+            if (item.baseUrl || item.imageUrl) {
+              photos.push({
+                url: item.baseUrl || item.imageUrl || "",
+                caption: item.accessibilityLabel || item.caption || "",
+              });
+            }
+          }
+          break;
+
+        case "AmenitiesSection":
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const group of section.seeAllAmenitiesGroups || []) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            for (const a of group.amenities || []) {
+              if (a.available !== false && a.title) {
+                amenities.push(a.title);
+              }
+            }
+          }
+          break;
+
+        case "HostProfileSection":
+          hostName = (section.title || "").replace(/^(Hosted by|Ospitato da)\s*/i, "");
+          if (section.hostProfileDescription?.htmlText?.toLowerCase().includes("superhost")) {
+            isSuperhost = true;
+          }
+          break;
+
+        case "PdpHighlightsSection":
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const h of section.highlights || []) {
+            if (h.title?.toLowerCase().includes("superhost")) {
+              isSuperhost = true;
+            }
+          }
+          break;
+      }
+    }
+
+    // Use metadata logging as fallback/enrichment
+    if (logging) {
+      if (!guests && logging.personCapacity) guests = logging.personCapacity;
+      if (!isSuperhost && logging.isSuperhost) isSuperhost = true;
+      if (!roomType && logging.roomType) roomType = logging.roomType;
+    }
+
+    // Extract price from metadata
+    let priceAmount = 0;
+    const bookingData = metadata?.bookingPrefetchData;
+    if (bookingData?.p3_display_rate?.amount) {
+      priceAmount = bookingData.p3_display_rate.amount;
+    } else if (bookingData?.p3DisplayRate?.amount) {
+      priceAmount = bookingData.p3DisplayRate.amount;
+    }
+    // Also try to find price in sections (BOOK_IT_SIDEBAR)
+    if (!priceAmount) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const s of sections) {
+        const section = s?.section;
+        const priceStr = section?.structuredDisplayPrice?.primaryLine?.price;
+        if (priceStr) {
+          const num = parseFloat(priceStr.replace(/[^0-9.,]/g, "").replace(",", "."));
+          if (!isNaN(num)) {
+            priceAmount = num;
+            break;
+          }
+        }
+      }
+    }
+
+    const ratingValue = logging?.guestSatisfactionOverall || 0;
+    const reviewCount = logging?.visibleReviewCount
+      ? parseInt(String(logging.visibleReviewCount), 10)
+      : 0;
+
+    // Extract reviews from ReviewsSection if present
+    const reviewSample: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const s of sections) {
+      const section = s?.section;
+      if (
+        section?.__typename === "ReviewsSection" ||
+        section?.__typename === "PdpReviewsSection"
+      ) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const r of section.reviews || []) {
+          const text = r.comments || r.reviewText || r.comment || "";
+          if (text && reviewSample.length < 4) {
+            reviewSample.push(text.replace(/<[^>]+>/g, " ").trim());
+          }
+        }
+      }
+    }
+
+    // Extract location
+    const locationTitle = logging?.locationTitle || "";
+    const locationParts = locationTitle.split(",").map((s: string) => s.trim());
+
+    const url = `https://www.airbnb.com/rooms/${roomId}`;
+
+    return {
+      url,
+      title,
+      description,
+      photoCount: photos.length,
+      photoCaptions: photos.map((p) => p.caption),
+      amenities,
+      price: { amount: priceAmount, currency: "EUR", period: "notte" },
+      rating: ratingValue,
+      reviewCount,
+      reviewSample,
+      propertyType: roomType,
+      location: {
+        city: locationParts[1] || locationParts[0] || "",
+        area: locationParts[0] || "",
+        country: locationParts[locationParts.length - 1] || "Italia",
+      },
+      host: { name: hostName, superhost: isSuperhost, responseRate: "N/A" },
+      guests,
+      bedrooms,
+      beds,
+      bathrooms,
+    };
+  } catch (err) {
+    console.error("Scraper: error parsing deferred state:", err);
+    return null;
+  }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractPrice(jsonLd: any, meta: { price: string }): number {
-  // Try JSON-LD offers
-  if (jsonLd?.offers?.price) {
-    return parseFloat(jsonLd.offers.price);
+// ---------------------------------------------------------------------------
+// Strategy 2: Airbnb v2 REST API (fallback)
+// ---------------------------------------------------------------------------
+
+async function scrapeFromV2Api(roomId: string): Promise<ListingData | null> {
+  try {
+    const apiUrl =
+      `https://www.airbnb.com/api/v2/pdp_listing_details/${roomId}` +
+      `?adults=1&_format=for_rooms_show&key=${AIRBNB_API_KEY}` +
+      `&locale=it&currency=EUR`;
+
+    const response = await fetch(apiUrl, {
+      headers: {
+        ...BROWSER_HEADERS,
+        "X-Airbnb-Api-Key": AIRBNB_API_KEY,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      console.error(`Scraper v2 API failed [${response.status}]:`, body.slice(0, 500));
+      return null;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json: any = await response.json();
+    const listing = json?.pdp_listing_detail || json?.listing;
+
+    if (!listing) {
+      console.error("Scraper v2: no listing data in response");
+      return null;
+    }
+
+    // Photos
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const photos = (listing.photos || []).map((p: any) => ({
+      url: p.large || p.medium || p.small || p.picture || "",
+      caption: p.caption || "",
+    }));
+
+    // Description: sectioned or flat
+    const desc = listing.sectioned_description;
+    const description = [
+      desc?.description || listing.description || "",
+      desc?.space || "",
+      desc?.neighborhood_overview || "",
+      desc?.transit || "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    // Amenities
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const amenities: string[] = (listing.listing_amenities || listing.amenities || []).map(
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (a: any) => (typeof a === "string" ? a : a.name || a.tag || "")
+    ).filter(Boolean);
+
+    // Reviews
+    const reviewSample: string[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const r of (listing.sorted_reviews || listing.reviews || []).slice(0, 4)) {
+      const text = r.comments || r.review || "";
+      if (text) reviewSample.push(text);
+    }
+
+    const url = `https://www.airbnb.com/rooms/${roomId}`;
+    const host = listing.primary_host || listing.user || listing.host || {};
+
+    return {
+      url,
+      title: listing.name || listing.title || "",
+      description,
+      photoCount: photos.length,
+      photoCaptions: photos.map((p: { caption: string }) => p.caption),
+      amenities,
+      price: {
+        amount: listing.price?.rate?.amount || listing.price_rate || listing.price || 0,
+        currency: "EUR",
+        period: "notte",
+      },
+      rating: listing.star_rating || listing.review_rating || listing.overall_rating || 0,
+      reviewCount: listing.review_count || listing.reviews_count || listing.visible_review_count || 0,
+      reviewSample,
+      propertyType: listing.room_type || listing.property_type || listing.room_type_category || "",
+      location: {
+        city: listing.city || listing.localized_city || "",
+        area: listing.neighborhood || listing.public_address || "",
+        country: listing.country || "Italia",
+      },
+      host: {
+        name: host.host_name || host.first_name || host.name || "",
+        superhost: host.is_superhost || false,
+        responseRate: host.response_rate_without_na || host.response_rate || "N/A",
+      },
+      guests: listing.person_capacity || listing.guest_count || 0,
+      bedrooms: listing.bedrooms || listing.bedroom_count || 0,
+      beds: listing.beds || listing.bed_count || 0,
+      bathrooms: listing.bathrooms || listing.bathroom_count || 0,
+    };
+  } catch (err) {
+    console.error("Scraper v2 API strategy error:", err);
+    return null;
   }
-  if (jsonLd?.offers?.lowPrice) {
-    return parseFloat(jsonLd.offers.lowPrice);
-  }
-  // Try og:price:amount meta tag
-  if (meta.price) {
-    return parseFloat(meta.price);
-  }
-  return 0;
 }
