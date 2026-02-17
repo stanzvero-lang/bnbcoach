@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropic, AI_MODEL } from "@/lib/anthropic";
-import { scrapeAirbnbListing } from "@/lib/apify";
+import { scrapeAirbnbListing } from "@/lib/scraper";
 import { getMockListingData, type ListingData } from "@/lib/mock-listing";
 
 // Extract JSON from a string that may contain markdown code fences or extra text
@@ -123,56 +123,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get listing data: try Apify first, fall back to mock data
+    // Get listing data: scrape directly from Airbnb, fall back to mock data
     let listingData: ListingData | null = null;
     let usingMock = false;
 
-    if (process.env.APIFY_API_TOKEN) {
-      const scraped = await scrapeAirbnbListing(url);
-      if (scraped) {
-        // Normalize tri_angle/airbnb-scraper response to our ListingData shape.
-        // The actor returns: name, description, stars, numberOfGuests, roomType,
-        // address (string), location {lat,lng}, reviews[], amenities[], price,
-        // images/photos arrays, host object, bedrooms, beds, bathrooms, etc.
-        const photos = scraped.images || scraped.photos || [];
-        listingData = {
-          url,
-          title: scraped.name || scraped.title || "",
-          description: scraped.description || "",
-          photoCount: photos.length || scraped.photoCount || 0,
-          photoCaptions: photos.map((p: string | { caption?: string; title?: string }) =>
-            typeof p === "string" ? "" : (p.caption || p.title || "")
-          ),
-          amenities: scraped.amenities || [],
-          price: {
-            amount: scraped.price?.rate || scraped.price?.amount
-              || scraped.pricing?.rate?.amount || 0,
-            currency: "EUR",
-            period: "notte",
-          },
-          rating: scraped.stars || scraped.rating || 0,
-          reviewCount: scraped.reviewsCount || scraped.numberOfReviews || 0,
-          reviewSample: (scraped.reviews || []).slice(0, 4).map(
-            (r: { comments?: string; text?: string }) => r.comments || r.text || ""
-          ),
-          propertyType: scraped.roomType || scraped.propertyType || "",
-          location: {
-            city: scraped.city || scraped.address?.city
-              || (typeof scraped.address === "string" ? scraped.address : "") || "",
-            area: scraped.neighborhood || scraped.address?.neighborhood || "",
-            country: scraped.country || scraped.countryCode || "Italia",
-          },
-          host: {
-            name: scraped.host?.name || scraped.host?.firstName || "",
-            superhost: scraped.host?.isSuperhost || scraped.host?.isSuperHost || false,
-            responseRate: scraped.host?.responseRate || "N/A",
-          },
-          guests: scraped.numberOfGuests || scraped.personCapacity || scraped.guestCount || 0,
-          bedrooms: scraped.bedrooms || scraped.bedroomCount || 0,
-          beds: scraped.beds || scraped.bedCount || 0,
-          bathrooms: scraped.bathrooms || scraped.bathroomCount || 0,
-        };
-      }
+    try {
+      listingData = await scrapeAirbnbListing(url);
+    } catch (scrapeErr) {
+      console.error("Scrape failed, falling back to mock data:", scrapeErr);
     }
 
     if (!listingData) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { scrapeAirbnbListing } from "@/lib/apify";
+import { scrapeAirbnbListing } from "@/lib/scraper";
 
 export async function POST(request: NextRequest) {
   try {

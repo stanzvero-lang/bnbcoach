@@ -195,7 +195,7 @@ export default function AnalyzePage() {
               <CardContent className="p-3 flex items-center gap-2">
                 <span>{"\u26A0\uFE0F"}</span>
                 <p className="text-xs text-warning">
-                  Apify non configurato: l&apos;analisi usa dati di esempio. Configura APIFY_API_TOKEN per dati reali.
+                  Scraping non riuscito: l&apos;analisi usa dati di esempio. Verifica che l&apos;URL Airbnb sia corretto e riprova.
                 </p>
               </CardContent>
             </Card>
