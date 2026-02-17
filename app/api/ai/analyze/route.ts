@@ -4,13 +4,6 @@ import { getAnthropic, AI_MODEL } from "@/lib/anthropic";
 import { scrapeAirbnbListing } from "@/lib/apify";
 import { getMockListingData, type ListingData } from "@/lib/mock-listing";
 
-function notConfigured() {
-  return NextResponse.json(
-    { error: "Servizio non ancora configurato. Configura le API key nelle variabili d'ambiente." },
-    { status: 503 }
-  );
-}
-
 // Extract JSON from a string that may contain markdown code fences or extra text
 function extractJSON(text: string): string {
   // Try to find JSON in code fences first
@@ -100,8 +93,6 @@ Consigli: specifici, azionabili, ordinati per impatto. Scrivi in italiano.`;
 export async function POST(request: NextRequest) {
   try {
     const anthropic = getAnthropic();
-    if (!anthropic) return notConfigured();
-
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 

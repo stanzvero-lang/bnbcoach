@@ -2,18 +2,9 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropic, AI_MODEL } from "@/lib/anthropic";
 
-function notConfigured() {
-  return NextResponse.json(
-    { error: "Servizio non ancora configurato. Configura le API key nelle variabili d'ambiente." },
-    { status: 503 }
-  );
-}
-
 export async function POST() {
   try {
     const anthropic = getAnthropic();
-    if (!anthropic) return notConfigured();
-
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
