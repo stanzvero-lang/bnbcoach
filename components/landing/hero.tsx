@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Star, TrendingUp, Users, BarChart3 } from "lucide-react";
+import { ArrowRight, TrendingUp } from "lucide-react";
 
 export function LandingHero() {
   return (
@@ -40,7 +40,7 @@ export function LandingHero() {
 
         {/* Score card mockup */}
         <div className="mt-12 md:mt-16 max-w-md mx-auto">
-          <div className="rounded-lg border border-border bg-card shadow-lg overflow-hidden">
+          <div className="rounded-lg border border-border bg-card shadow-soft-lg overflow-hidden">
             {/* Card header */}
             <div className="bg-surface/60 px-5 py-3 border-b border-border flex items-center justify-between">
               <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
@@ -73,14 +73,14 @@ export function LandingHero() {
               {/* Score breakdown */}
               <div className="space-y-2.5">
                 {[
-                  { label: "Titolo", score: 85, max: 100, color: "#008A05" },
-                  { label: "Descrizione", score: 78, max: 100, color: "#008A05" },
-                  { label: "Prezzo", score: 65, max: 100, color: "#E07912" },
-                  { label: "Foto", score: 52, max: 100, color: "#E07912" },
-                  { label: "Amenities", score: 70, max: 100, color: "#008A05" },
+                  { label: "\u270D\uFE0F Titolo", score: 85, color: "#008A05" },
+                  { label: "\uD83D\uDCDD Descrizione", score: 78, color: "#008A05" },
+                  { label: "\uD83D\uDCB0 Prezzo", score: 65, color: "#E07912" },
+                  { label: "\uD83D\uDCF8 Foto", score: 52, color: "#E07912" },
+                  { label: "\uD83D\uDECB\uFE0F Amenities", score: 70, color: "#008A05" },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-3">
-                    <span className="text-xs text-text-secondary w-20 shrink-0">{item.label}</span>
+                    <span className="text-xs text-text-secondary w-24 shrink-0">{item.label}</span>
                     <div className="flex-1 h-2 rounded-full bg-surface overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all"
@@ -100,19 +100,16 @@ export function LandingHero() {
         {/* Social proof numbers */}
         <div className="mt-12 md:mt-16 grid grid-cols-3 gap-4 max-w-md mx-auto">
           {[
-            { icon: Users, value: "2.400+", label: "Host iscritti" },
-            { icon: BarChart3, value: "12.000+", label: "Analisi completate" },
-            { icon: Star, value: "4.8/5", label: "Valutazione media" },
-          ].map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <div key={stat.label} className="text-center">
-                <Icon className="h-4 w-4 text-text-secondary mx-auto mb-1.5" />
-                <p className="text-lg font-bold text-dark">{stat.value}</p>
-                <p className="text-xs text-text-secondary">{stat.label}</p>
-              </div>
-            );
-          })}
+            { emoji: "\uD83D\uDC65", value: "2.400+", label: "Host iscritti" },
+            { emoji: "\uD83D\uDCC8", value: "12.000+", label: "Analisi completate" },
+            { emoji: "\u2B50", value: "4.8/5", label: "Valutazione media" },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center">
+              <span className="text-lg block mb-1">{stat.emoji}</span>
+              <p className="text-lg font-bold text-dark">{stat.value}</p>
+              <p className="text-xs text-text-secondary">{stat.label}</p>
+            </div>
+          ))}
         </div>
       </div>
     </section>

@@ -1,26 +1,24 @@
-import { Star } from "lucide-react";
-
 const testimonials = [
   {
     name: "Marco R.",
     location: "Roma",
     property: "Appartamento, Trastevere",
     text: "In 3 settimane il mio annuncio è passato da 45 a 82 punti. I consigli sulle foto hanno fatto la differenza: ho riscattato tutto seguendo le istruzioni e le prenotazioni sono aumentate subito.",
-    highlight: "Da 45 a 82 punti",
+    highlight: "\uD83D\uDCC8 Da 45 a 82 punti",
   },
   {
     name: "Giulia T.",
     location: "Firenze",
     property: "Casa, Centro storico",
     text: "Il generatore di titoli mi ha dato un'idea a cui non avrei mai pensato. Da quando ho cambiato titolo e descrizione, ho il 30% in più di click sul mio annuncio.",
-    highlight: "+30% click sull'annuncio",
+    highlight: "\uD83D\uDE80 +30% click sull'annuncio",
   },
   {
     name: "Andrea M.",
     location: "Milano",
     property: "Stanza, Navigli",
     text: "I task settimanali ti danno la motivazione giusta. Ogni settimana fai 3 cose concrete e vedi i risultati. È come avere un consulente che ti segue senza pagare 500 euro.",
-    highlight: "Come un consulente personale",
+    highlight: "\uD83C\uDFC6 Come un consulente personale",
   },
 ];
 
@@ -41,13 +39,11 @@ export function LandingTestimonials() {
           {testimonials.map((t) => (
             <div
               key={t.name}
-              className="rounded-lg border border-border bg-card p-5 md:p-6 flex flex-col"
+              className="rounded-lg border border-border bg-card p-5 md:p-6 flex flex-col shadow-soft hover:shadow-soft-lg transition-shadow duration-200"
             >
               {/* Stars */}
-              <div className="flex gap-0.5 mb-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <Star key={i} className="h-4 w-4 fill-warning text-warning" />
-                ))}
+              <div className="flex gap-0.5 mb-3 text-base">
+                {"\u2B50\u2B50\u2B50\u2B50\u2B50"}
               </div>
 
               {/* Highlight pill */}

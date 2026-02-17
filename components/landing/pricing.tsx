@@ -31,7 +31,7 @@ export function LandingPricing() {
 
         <div className="grid gap-4 md:grid-cols-2 max-w-3xl mx-auto">
           {/* Free plan */}
-          <div className="rounded-lg border border-border bg-card p-6 md:p-8">
+          <div className="rounded-lg border border-border bg-card p-6 md:p-8 shadow-soft">
             <h3 className="font-bold text-dark text-lg">Free</h3>
             <div className="mt-3 flex items-baseline gap-1">
               <span className="text-4xl font-bold text-dark">&euro;0</span>
@@ -67,7 +67,7 @@ export function LandingPricing() {
           </div>
 
           {/* Pro plan */}
-          <div className="rounded-lg border-2 border-primary bg-card p-6 md:p-8 relative">
+          <div className="rounded-lg border-2 border-primary bg-card p-6 md:p-8 relative shadow-soft-lg">
             <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-xs font-semibold px-3 py-1 rounded-full">
               Consigliato
             </div>

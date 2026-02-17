@@ -2,14 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
-import {
-  Search,
-  Camera,
-  Type,
-  MessageSquare,
-  Package,
-  ShoppingCart,
-} from "lucide-react";
 
 export default function DashboardPage() {
   return (
@@ -38,14 +30,9 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 gap-3">
           {tools.map((tool) => (
             <Link key={tool.href} href={tool.href}>
-              <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+              <Card className="hover:shadow-soft-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full">
                 <CardContent className="p-4 flex flex-col items-start gap-2">
-                  <div
-                    className="p-2 rounded-lg"
-                    style={{ backgroundColor: tool.bgColor }}
-                  >
-                    <tool.icon className="h-5 w-5" style={{ color: tool.color }} />
-                  </div>
+                  <span className="text-3xl">{tool.emoji}</span>
                   <span className="font-medium text-sm">{tool.label}</span>
                   <span className="text-xs text-text-secondary">
                     {tool.description}
@@ -60,7 +47,9 @@ export default function DashboardPage() {
       {/* Weekly Tasks Preview */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-lg">Task della settimana</CardTitle>
+          <CardTitle className="text-lg">
+            {"\uD83D\uDCCB"} Task della settimana
+          </CardTitle>
           <Badge variant="secondary">0/3</Badge>
         </CardHeader>
         <CardContent>
@@ -84,48 +73,36 @@ const tools = [
     href: "/analyze",
     label: "Analisi Listing",
     description: "Score e consigli",
-    icon: Search,
-    color: "#FF385C",
-    bgColor: "#FFF0F3",
+    emoji: "\uD83D\uDD0D",
   },
   {
     href: "/photos",
     label: "Photo Coach",
     description: "Migliora le foto",
-    icon: Camera,
-    color: "#E07912",
-    bgColor: "#FFF4E5",
+    emoji: "\uD83D\uDCF8",
   },
   {
     href: "/titles",
     label: "Titoli & Testi",
     description: "Genera varianti",
-    icon: Type,
-    color: "#008A05",
-    bgColor: "#E8F5E9",
+    emoji: "\u270D\uFE0F",
   },
   {
     href: "/reviews",
     label: "Recensioni",
     description: "Risposte AI",
-    icon: MessageSquare,
-    color: "#1A1A2E",
-    bgColor: "#EDE7F6",
+    emoji: "\u2B50",
   },
   {
     href: "/amenities",
     label: "Amenities",
     description: "Gap analysis",
-    icon: Package,
-    color: "#0288D1",
-    bgColor: "#E1F5FE",
+    emoji: "\uD83D\uDECB\uFE0F",
   },
   {
     href: "/shopping",
     label: "Shopping List",
     description: "Cosa comprare",
-    icon: ShoppingCart,
-    color: "#6D4C41",
-    bgColor: "#EFEBE9",
+    emoji: "\uD83D\uDED2",
   },
 ];

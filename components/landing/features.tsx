@@ -1,61 +1,41 @@
-import {
-  Search,
-  Camera,
-  Type,
-  CheckSquare,
-  MessageSquare,
-  Package,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const features = [
   {
-    icon: Search,
+    emoji: "\uD83D\uDD0D",
     title: "Analisi Listing",
     description:
-      "Incolla l'URL del tuo annuncio e ricevi uno score 0-100 con breakdown per titolo, foto, descrizione, amenities e prezzo. Più 5 consigli per migliorare subito.",
-    color: "#FF385C",
-    bgColor: "#FFF0F3",
+      "Incolla l'URL del tuo annuncio e ricevi uno score 0-100 con breakdown per titolo, foto, descrizione, amenities e prezzo. Pi\u00F9 5 consigli per migliorare subito.",
   },
   {
-    icon: Camera,
+    emoji: "\uD83D\uDCF8",
     title: "Photo Coach AI",
     description:
       "Carica le foto e l'AI ti dice cosa va bene, cosa migliorare e come riscattare: ora del giorno, angolazione, cosa spostare.",
-    color: "#E07912",
-    bgColor: "#FFF4E5",
   },
   {
-    icon: Type,
+    emoji: "\u270D\uFE0F",
     title: "Titoli & Descrizioni",
     description:
       "5 varianti di titolo e descrizione ottimizzati SEO. Toni diversi: luxury, cozy, modern. Copia e pubblica con un click.",
-    color: "#008A05",
-    bgColor: "#E8F5E9",
   },
   {
-    icon: CheckSquare,
+    emoji: "\uD83D\uDCCB",
     title: "Task Settimanali",
     description:
       "3 task personalizzati a settimana, ordinati per impatto. Traccia i progressi e costruisci una streak vincente.",
-    color: "#0288D1",
-    bgColor: "#E1F5FE",
   },
   {
-    icon: MessageSquare,
+    emoji: "\u2B50",
     title: "Risposte Recensioni",
     description:
       "Incolla una recensione, scegli il tono e ottieni una risposta professionale da copiare in un click.",
-    color: "#7B1FA2",
-    bgColor: "#F3E5F5",
   },
   {
-    icon: Package,
+    emoji: "\uD83D\uDECB\uFE0F",
     title: "Amenity Gap Finder",
     description:
-      "Confronta i servizi del tuo alloggio con la concorrenza. Scopri cosa aggiungere per più prenotazioni.",
-    color: "#455A64",
-    bgColor: "#ECEFF1",
+      "Confronta i servizi del tuo alloggio con la concorrenza. Scopri cosa aggiungere per pi\u00F9 prenotazioni.",
   },
 ];
 
@@ -76,30 +56,22 @@ export function LandingFeatures() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => {
-            const Icon = f.icon;
-            return (
-              <div
-                key={f.title}
-                className="group rounded-lg border border-border bg-card p-5 md:p-6 hover:shadow-md hover:border-border/80 transition-all"
-              >
-                <div
-                  className="inline-flex p-2.5 rounded-lg mb-4"
-                  style={{ backgroundColor: f.bgColor }}
-                >
-                  <Icon className="h-5 w-5" style={{ color: f.color }} />
-                </div>
-                <h3 className="font-bold text-dark mb-1.5">{f.title}</h3>
-                <p className="text-sm text-text-secondary leading-relaxed">
-                  {f.description}
-                </p>
-                <div className="mt-4 flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                  Scopri di più
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </div>
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="group rounded-lg border border-border bg-card p-5 md:p-6 shadow-soft hover:shadow-soft-lg hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <span className="text-4xl block mb-4">{f.emoji}</span>
+              <h3 className="font-bold text-dark mb-1.5">{f.title}</h3>
+              <p className="text-sm text-text-secondary leading-relaxed">
+                {f.description}
+              </p>
+              <div className="mt-4 flex items-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                Scopri di pi\u00F9
+                <ArrowRight className="h-3.5 w-3.5" />
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
     </section>

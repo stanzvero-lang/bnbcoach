@@ -44,7 +44,11 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
+        sans: ["Poppins", "system-ui", "sans-serif"],
+      },
+      boxShadow: {
+        soft: "0 2px 12px rgba(0,0,0,0.08)",
+        "soft-lg": "0 4px 24px rgba(0,0,0,0.10)",
       },
       borderRadius: {
         lg: "12px",

@@ -99,7 +99,7 @@ bnbcoach/
 
 ### Typography
 
-* Font: Inter (Google Fonts) - fallback: system-ui, sans-serif
+* Font: Poppins (Google Fonts) - fallback: system-ui, sans-serif
 * Headings: bold, colore #222222
 * Body: 16px regular, colore #222222
 * Caption: 14px, colore #717171

@@ -6,6 +6,7 @@ export function LandingCTA() {
   return (
     <section className="py-16 px-4 md:px-6 md:py-24 bg-dark">
       <div className="max-w-2xl mx-auto text-center">
+        <p className="text-4xl mb-4">{"\uD83D\uDE80"}</p>
         <h2 className="text-3xl font-bold text-white md:text-4xl leading-tight">
           Pronto a migliorare
           <br className="hidden sm:block" />

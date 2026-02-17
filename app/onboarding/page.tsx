@@ -5,40 +5,66 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 const STEPS = [
   {
+    emoji: "\uD83C\uDFE0",
     title: "Tipo di proprietà",
     description: "Che tipo di alloggio vuoi gestire?",
     field: "property_type" as const,
-    options: ["Appartamento", "Casa", "Stanza", "Villa", "Altro"],
+    options: [
+      { emoji: "\uD83C\uDFE2", label: "Appartamento" },
+      { emoji: "\uD83C\uDFE1", label: "Casa" },
+      { emoji: "\uD83D\uDECF\uFE0F", label: "Stanza" },
+      { emoji: "\uD83C\uDFD6\uFE0F", label: "Villa" },
+      { emoji: "\uD83C\uDFD8\uFE0F", label: "Altro" },
+    ],
   },
   {
+    emoji: "\uD83D\uDCCD",
     title: "Posizione",
     description: "Dove si trova il tuo alloggio?",
     field: "location" as const,
     options: null,
   },
   {
+    emoji: "\uD83D\uDCCA",
     title: "Esperienza",
     description: "Da quanto tempo sei host?",
     field: "experience_level" as const,
-    options: ["Nuovo, non ho ancora iniziato", "Meno di 6 mesi", "6-12 mesi", "Più di 1 anno"],
+    options: [
+      { emoji: "\uD83C\uDD95", label: "Nuovo, non ho ancora iniziato" },
+      { emoji: "\uD83C\uDF31", label: "Meno di 6 mesi" },
+      { emoji: "\uD83D\uDCAA", label: "6-12 mesi" },
+      { emoji: "\u2B50", label: "Più di 1 anno" },
+    ],
   },
   {
+    emoji: "\uD83D\uDC65",
     title: "Guest target",
     description: "Chi sono i tuoi ospiti ideali? (puoi scegliere più di uno)",
     field: "guest_target" as const,
-    options: ["Turisti", "Business", "Famiglie", "Coppie", "Digital nomad"],
+    options: [
+      { emoji: "\uD83C\uDF0D", label: "Turisti" },
+      { emoji: "\uD83D\uDCBC", label: "Business" },
+      { emoji: "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66", label: "Famiglie" },
+      { emoji: "\u2764\uFE0F", label: "Coppie" },
+      { emoji: "\uD83D\uDCBB", label: "Digital nomad" },
+    ],
   },
   {
+    emoji: "\uD83D\uDCB0",
     title: "Budget miglioramenti",
     description: "Quanto vuoi investire per migliorare il tuo alloggio?",
     field: "improvement_budget" as const,
-    options: ["0 € - Solo consigli gratuiti", "Fino a 200 €", "200 - 500 €", "500+ €"],
+    options: [
+      { emoji: "\uD83C\uDD93", label: "0 \u20AC - Solo consigli gratuiti" },
+      { emoji: "\uD83D\uDCB5", label: "Fino a 200 \u20AC" },
+      { emoji: "\uD83D\uDCB3", label: "200 - 500 \u20AC" },
+      { emoji: "\uD83D\uDCB0", label: "500+ \u20AC" },
+    ],
   },
 ];
 
@@ -133,23 +159,29 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 bg-surface">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <div className="mb-4">
-            <Progress value={progress} />
-            <p className="text-xs text-text-secondary mt-2 text-right">
-              {step + 1} di {STEPS.length}
-            </p>
-          </div>
-          <CardTitle>{currentStep.title}</CardTitle>
-          <CardDescription>{currentStep.description}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+    <main className="min-h-screen flex items-center justify-center px-4 bg-surface">
+      <div className="w-full max-w-lg">
+        {/* Progress */}
+        <div className="mb-6">
+          <Progress value={progress} />
+          <p className="text-xs text-text-secondary mt-2 text-right">
+            {step + 1} di {STEPS.length}
+          </p>
+        </div>
+
+        {/* Step header */}
+        <div className="text-center mb-8">
+          <span className="text-5xl block mb-3">{currentStep.emoji}</span>
+          <h1 className="text-2xl font-bold text-dark">{currentStep.title}</h1>
+          <p className="text-text-secondary mt-1">{currentStep.description}</p>
+        </div>
+
+        {/* Step content */}
+        <div className="space-y-3">
           {currentStep.field === "location" ? (
             <div className="space-y-3">
               <div>
-                <label className="text-sm font-medium">Città</label>
+                <label className="text-sm font-medium mb-1.5 block">Città</label>
                 <Input
                   placeholder="es. Roma, Milano, Firenze..."
                   value={data.location_city}
@@ -159,7 +191,7 @@ export default function OnboardingPage() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Quartiere / Zona</label>
+                <label className="text-sm font-medium mb-1.5 block">Quartiere / Zona</label>
                 <Input
                   placeholder="es. Centro, Trastevere, Navigli..."
                   value={data.location_area}
@@ -170,34 +202,47 @@ export default function OnboardingPage() {
               </div>
             </div>
           ) : (
-            currentStep.options?.map((option) => {
-              const isSelected =
-                currentStep.field === "guest_target"
-                  ? data.guest_target.includes(option)
-                  : data[currentStep.field as keyof FormData] === option;
+            <div className={cn(
+              "grid gap-3",
+              currentStep.options && currentStep.options.length <= 4
+                ? "grid-cols-2"
+                : "grid-cols-2 sm:grid-cols-3"
+            )}>
+              {currentStep.options?.map((option) => {
+                const isSelected =
+                  currentStep.field === "guest_target"
+                    ? data.guest_target.includes(option.label)
+                    : data[currentStep.field as keyof FormData] === option.label;
 
-              return (
-                <button
-                  key={option}
-                  onClick={() => selectOption(option)}
-                  className={cn(
-                    "w-full text-left p-4 rounded-lg border transition-colors text-sm",
-                    isSelected
-                      ? "border-primary bg-primary/5 text-primary font-medium"
-                      : "border-border bg-background hover:border-primary/50"
-                  )}
-                >
-                  {option}
-                </button>
-              );
-            })
+                return (
+                  <button
+                    key={option.label}
+                    onClick={() => selectOption(option.label)}
+                    className={cn(
+                      "flex flex-col items-center gap-2 p-5 rounded-xl border-2 transition-all duration-200 text-center",
+                      isSelected
+                        ? "border-primary bg-primary/5 shadow-soft-lg scale-[1.02]"
+                        : "border-border bg-card hover:border-primary/30 hover:shadow-soft"
+                    )}
+                  >
+                    <span className="text-3xl">{option.emoji}</span>
+                    <span className={cn(
+                      "text-sm font-medium leading-tight",
+                      isSelected ? "text-primary" : "text-dark"
+                    )}>
+                      {option.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           )}
 
           {error && (
-            <p className="text-sm text-error">{error}</p>
+            <p className="text-sm text-error text-center">{error}</p>
           )}
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex gap-3 pt-6">
             {step > 0 && (
               <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
                 Indietro
@@ -211,12 +256,12 @@ export default function OnboardingPage() {
               {loading
                 ? "Salvataggio..."
                 : step === STEPS.length - 1
-                ? "Completa"
+                ? "Completa \uD83C\uDF89"
                 : "Avanti"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </main>
   );
 }

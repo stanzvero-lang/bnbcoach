@@ -1,23 +1,21 @@
-import { ClipboardList, Zap, TrendingUp } from "lucide-react";
-
 const steps = [
   {
     number: "1",
-    icon: ClipboardList,
+    emoji: "\uD83D\uDCDD",
     title: "Rispondi a 5 domande",
     description:
-      "Tipo di proprietà, posizione, esperienza, target ospiti e budget. In 2 minuti il coach conosce il tuo profilo.",
+      "Tipo di propriet\u00E0, posizione, esperienza, target ospiti e budget. In 2 minuti il coach conosce il tuo profilo.",
   },
   {
     number: "2",
-    icon: Zap,
+    emoji: "\uD83D\uDD0D",
     title: "Analizza il tuo annuncio",
     description:
       "Incolla l'URL Airbnb. L'AI analizza titolo, foto, descrizione, amenities e prezzo. Ricevi uno score 0-100.",
   },
   {
     number: "3",
-    icon: TrendingUp,
+    emoji: "\uD83D\uDE80",
     title: "Migliora ogni settimana",
     description:
       "Segui i task personalizzati, usa gli strumenti AI e guarda il tuo punteggio salire. Un passo alla volta.",
@@ -42,23 +40,20 @@ export function LandingHowItWorks() {
           <div className="hidden md:block absolute top-10 left-[calc(16.67%+24px)] right-[calc(16.67%+24px)] h-px bg-border" />
 
           <div className="grid gap-10 md:grid-cols-3 md:gap-6">
-            {steps.map((step) => {
-              const Icon = step.icon;
-              return (
-                <div key={step.number} className="relative flex flex-col items-center text-center">
-                  {/* Number circle */}
-                  <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white font-bold text-lg mb-5 shadow-sm">
-                    {step.number}
-                  </div>
-
-                  <Icon className="h-7 w-7 text-primary mb-3" />
-                  <h3 className="font-bold text-dark mb-2">{step.title}</h3>
-                  <p className="text-sm text-text-secondary leading-relaxed max-w-[260px]">
-                    {step.description}
-                  </p>
+            {steps.map((step) => (
+              <div key={step.number} className="relative flex flex-col items-center text-center">
+                {/* Number circle */}
+                <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white font-bold text-lg mb-4 shadow-soft">
+                  {step.number}
                 </div>
-              );
-            })}
+
+                <span className="text-3xl mb-3">{step.emoji}</span>
+                <h3 className="font-bold text-dark mb-2">{step.title}</h3>
+                <p className="text-sm text-text-secondary leading-relaxed max-w-[260px]">
+                  {step.description}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       </div>
