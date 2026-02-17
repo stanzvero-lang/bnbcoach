@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-export const AI_MODEL = "claude-3-5-sonnet-20241022";
+export const AI_MODEL = "claude-sonnet-4-20250514";
 
 // Create client on demand.  We pass the key explicitly because Next.js
 // only makes env vars available at runtime when it sees a direct
