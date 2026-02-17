@@ -107,9 +107,9 @@ export async function POST(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profile?.subscription_tier === "free" && (profile?.analyses_used ?? 0) >= 3) {
+    if (profile?.subscription_tier === "free" && (profile?.analyses_used ?? 0) >= 10) {
       return NextResponse.json(
-        { error: "Hai raggiunto il limite di 3 analisi gratuite. Passa a Pro per analisi illimitate." },
+        { error: "Hai raggiunto il limite di 10 analisi gratuite. Passa a Pro per analisi illimitate." },
         { status: 403 }
       );
     }

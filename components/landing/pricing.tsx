@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
 
 const features = [
-  { label: "Analisi listing", free: "3 analisi", pro: "Illimitate" },
+  { label: "Analisi listing", free: "10 analisi", pro: "Illimitate" },
   { label: "Photo Coach AI", free: "3 foto", pro: "10 foto" },
   { label: "Generatore titoli e descrizioni", free: true, pro: true },
   { label: "Risposte recensioni", free: true, pro: "Illimitate" },

@@ -56,7 +56,7 @@ export default function SettingsPage() {
             <Badge>Free</Badge>
           </div>
           <p className="text-sm text-text-secondary">
-            3 analisi gratuite. Passa a Pro per analisi illimitate.
+            10 analisi gratuite. Passa a Pro per analisi illimitate.
           </p>
           <Button variant="outline" className="w-full">
             Upgrade a Pro
