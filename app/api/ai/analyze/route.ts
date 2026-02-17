@@ -130,37 +130,47 @@ export async function POST(request: NextRequest) {
     if (process.env.APIFY_API_TOKEN) {
       const scraped = await scrapeAirbnbListing(url);
       if (scraped) {
-        // Normalize Apify response to our ListingData shape
+        // Normalize tri_angle/airbnb-scraper response to our ListingData shape.
+        // The actor returns: name, description, stars, numberOfGuests, roomType,
+        // address (string), location {lat,lng}, reviews[], amenities[], price,
+        // images/photos arrays, host object, bedrooms, beds, bathrooms, etc.
+        const photos = scraped.images || scraped.photos || [];
         listingData = {
           url,
           title: scraped.name || scraped.title || "",
           description: scraped.description || "",
-          photoCount: scraped.photos?.length || 0,
-          photoCaptions: (scraped.photos || []).map((p: { caption?: string }) => p.caption || ""),
+          photoCount: photos.length || scraped.photoCount || 0,
+          photoCaptions: photos.map((p: string | { caption?: string; title?: string }) =>
+            typeof p === "string" ? "" : (p.caption || p.title || "")
+          ),
           amenities: scraped.amenities || [],
           price: {
-            amount: scraped.price?.rate || scraped.pricing?.rate?.amount || 0,
+            amount: scraped.price?.rate || scraped.price?.amount
+              || scraped.pricing?.rate?.amount || 0,
             currency: "EUR",
             period: "notte",
           },
-          rating: scraped.rating || scraped.stars || 0,
+          rating: scraped.stars || scraped.rating || 0,
           reviewCount: scraped.reviewsCount || scraped.numberOfReviews || 0,
-          reviewSample: (scraped.reviews || []).slice(0, 4).map((r: { comments?: string }) => r.comments || ""),
+          reviewSample: (scraped.reviews || []).slice(0, 4).map(
+            (r: { comments?: string; text?: string }) => r.comments || r.text || ""
+          ),
           propertyType: scraped.roomType || scraped.propertyType || "",
           location: {
-            city: scraped.city || scraped.address?.city || "",
+            city: scraped.city || scraped.address?.city
+              || (typeof scraped.address === "string" ? scraped.address : "") || "",
             area: scraped.neighborhood || scraped.address?.neighborhood || "",
-            country: scraped.country || "Italia",
+            country: scraped.country || scraped.countryCode || "Italia",
           },
           host: {
-            name: scraped.host?.name || "",
-            superhost: scraped.host?.isSuperhost || false,
+            name: scraped.host?.name || scraped.host?.firstName || "",
+            superhost: scraped.host?.isSuperhost || scraped.host?.isSuperHost || false,
             responseRate: scraped.host?.responseRate || "N/A",
           },
-          guests: scraped.personCapacity || scraped.guestCount || 0,
-          bedrooms: scraped.bedroomCount || scraped.bedrooms || 0,
-          beds: scraped.bedCount || scraped.beds || 0,
-          bathrooms: scraped.bathroomCount || scraped.bathrooms || 0,
+          guests: scraped.numberOfGuests || scraped.personCapacity || scraped.guestCount || 0,
+          bedrooms: scraped.bedrooms || scraped.bedroomCount || 0,
+          beds: scraped.beds || scraped.bedCount || 0,
+          bathrooms: scraped.bathrooms || scraped.bathroomCount || 0,
         };
       }
     }

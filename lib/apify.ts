@@ -1,5 +1,5 @@
 // Apify API v2 requires tilde notation for actor IDs (not slash)
-const ACTOR_ID = "dtrungtin~airbnb-scraper";
+const ACTOR_ID = "tri_angle~airbnb-scraper";
 
 interface ApifyRunResponse {
   data: {
@@ -26,6 +26,12 @@ export async function scrapeAirbnbListing(url: string) {
     body: JSON.stringify({
       startUrls: [{ url }],
       maxListings: 1,
+      includeReviews: true,
+      maxReviews: 10,
+      currency: "EUR",
+      addMoreHostInfo: true,
+      calendarMonths: 0,
+      proxyConfiguration: { useApifyProxy: true },
     }),
   });
 
