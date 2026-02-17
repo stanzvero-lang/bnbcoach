@@ -23,7 +23,7 @@ export default function SignupPage() {
     setError("");
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -34,6 +34,14 @@ export default function SignupPage() {
       if (error) {
         setError(error.message);
         return;
+      }
+
+      // Create initial profile row so onboarding can upsert into it
+      if (data.user) {
+        await supabase.from("profiles").upsert({
+          id: data.user.id,
+          name,
+        });
       }
 
       router.push("/onboarding");

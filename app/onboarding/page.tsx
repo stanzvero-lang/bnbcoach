@@ -54,6 +54,7 @@ interface FormData {
 export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [data, setData] = useState<FormData>({
     property_type: "",
     location_city: "",
@@ -101,11 +102,15 @@ export default function OnboardingPage() {
 
     // Last step - save to Supabase
     setLoading(true);
+    setError("");
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Non autenticato");
+      if (!user) {
+        setError("Sessione scaduta. Effettua di nuovo il login.");
+        return;
+      }
 
-      const { error } = await supabase.from("profiles").upsert({
+      const { error: saveError } = await supabase.from("profiles").upsert({
         id: user.id,
         property_type: data.property_type,
         location_city: data.location_city,
@@ -116,10 +121,12 @@ export default function OnboardingPage() {
         updated_at: new Date().toISOString(),
       });
 
-      if (error) throw error;
+      if (saveError) throw saveError;
       router.push("/dashboard");
+      router.refresh();
     } catch (err) {
       console.error("Errore salvataggio profilo:", err);
+      setError("Errore durante il salvataggio. Riprova.");
     } finally {
       setLoading(false);
     }
@@ -184,6 +191,10 @@ export default function OnboardingPage() {
                 </button>
               );
             })
+          )}
+
+          {error && (
+            <p className="text-sm text-error">{error}</p>
           )}
 
           <div className="flex gap-3 pt-4">

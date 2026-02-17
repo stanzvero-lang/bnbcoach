@@ -13,51 +13,53 @@ const steps = [
     icon: Zap,
     title: "Analizza il tuo annuncio",
     description:
-      "Incolla l'URL Airbnb. L'AI analizza titolo, foto, descrizione, amenities e prezzo. Ricevi uno score dettagliato.",
+      "Incolla l'URL Airbnb. L'AI analizza titolo, foto, descrizione, amenities e prezzo. Ricevi uno score 0-100.",
   },
   {
     number: "3",
     icon: TrendingUp,
-    title: "Migliora settimana dopo settimana",
+    title: "Migliora ogni settimana",
     description:
-      "Segui i task personalizzati, usa gli strumenti AI e guarda il tuo punteggio salire. Ogni settimana, un passo avanti.",
+      "Segui i task personalizzati, usa gli strumenti AI e guarda il tuo punteggio salire. Un passo alla volta.",
   },
 ];
 
 export function LandingHowItWorks() {
   return (
-    <section id="how-it-works" className="py-20 px-4 md:px-6 bg-surface">
+    <section id="how-it-works" className="py-16 px-4 md:px-6 md:py-24 bg-surface">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold text-dark md:text-4xl">
+        <div className="text-center mb-12 md:mb-16">
+          <p className="text-sm font-semibold text-primary mb-2 uppercase tracking-wider">
             Come funziona
-          </h2>
-          <p className="mt-4 text-lg text-text-secondary max-w-xl mx-auto">
-            Tre passi per trasformare il tuo annuncio Airbnb
           </p>
+          <h2 className="text-3xl font-bold text-dark md:text-4xl">
+            Tre passi per trasformare il tuo annuncio
+          </h2>
         </div>
 
-        <div className="grid gap-8 md:grid-cols-3">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <div key={step.number} className="relative text-center">
-                {/* Step number */}
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white text-lg font-bold mb-6">
-                  {step.number}
-                </div>
+        <div className="relative max-w-3xl mx-auto">
+          {/* Connecting line — desktop only */}
+          <div className="hidden md:block absolute top-10 left-[calc(16.67%+24px)] right-[calc(16.67%+24px)] h-px bg-border" />
 
-                <div className="flex justify-center mb-4">
-                  <Icon className="h-8 w-8 text-primary" />
-                </div>
+          <div className="grid gap-10 md:grid-cols-3 md:gap-6">
+            {steps.map((step) => {
+              const Icon = step.icon;
+              return (
+                <div key={step.number} className="relative flex flex-col items-center text-center">
+                  {/* Number circle */}
+                  <div className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white font-bold text-lg mb-5 shadow-sm">
+                    {step.number}
+                  </div>
 
-                <h3 className="font-bold text-dark text-lg mb-3">{step.title}</h3>
-                <p className="text-sm text-text-secondary leading-relaxed max-w-xs mx-auto">
-                  {step.description}
-                </p>
-              </div>
-            );
-          })}
+                  <Icon className="h-7 w-7 text-primary mb-3" />
+                  <h3 className="font-bold text-dark mb-2">{step.title}</h3>
+                  <p className="text-sm text-text-secondary leading-relaxed max-w-[260px]">
+                    {step.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </section>

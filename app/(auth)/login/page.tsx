@@ -22,7 +22,7 @@ export default function LoginPage() {
     setError("");
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -32,7 +32,18 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/dashboard");
+      // Check if onboarding is completed
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("property_type")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profile?.property_type) {
+        router.push("/dashboard");
+      } else {
+        router.push("/onboarding");
+      }
       router.refresh();
     } catch {
       setError("Si è verificato un errore. Riprova.");

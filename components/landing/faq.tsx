@@ -35,39 +35,44 @@ export function LandingFAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section className="py-20 px-4 md:px-6">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-16">
+    <section id="faq" className="py-16 px-4 md:px-6 md:py-24">
+      <div className="max-w-2xl mx-auto">
+        <div className="text-center mb-12">
+          <p className="text-sm font-semibold text-primary mb-2 uppercase tracking-wider">
+            FAQ
+          </p>
           <h2 className="text-3xl font-bold text-dark md:text-4xl">
             Domande frequenti
           </h2>
         </div>
 
-        <div className="space-y-3">
+        <div className="divide-y divide-border border-t border-b border-border">
           {faqs.map((faq, i) => (
-            <div
-              key={i}
-              className="bg-card rounded-lg border border-border overflow-hidden"
-            >
+            <div key={i}>
               <button
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="w-full flex items-center justify-between p-4 md:p-5 text-left gap-4"
+                className="w-full flex items-center justify-between py-4 md:py-5 text-left gap-4"
               >
-                <span className="font-medium text-sm md:text-base">{faq.q}</span>
+                <span className="font-medium text-sm md:text-base text-dark">
+                  {faq.q}
+                </span>
                 <ChevronDown
                   className={cn(
-                    "h-5 w-5 text-text-secondary flex-shrink-0 transition-transform",
+                    "h-5 w-5 text-text-secondary shrink-0 transition-transform duration-200",
                     openIndex === i && "rotate-180"
                   )}
                 />
               </button>
-              {openIndex === i && (
-                <div className="px-4 pb-4 md:px-5 md:pb-5">
-                  <p className="text-sm text-text-secondary leading-relaxed">
-                    {faq.a}
-                  </p>
-                </div>
-              )}
+              <div
+                className={cn(
+                  "overflow-hidden transition-all duration-200",
+                  openIndex === i ? "max-h-40 pb-4 md:pb-5" : "max-h-0"
+                )}
+              >
+                <p className="text-sm text-text-secondary leading-relaxed pr-8">
+                  {faq.a}
+                </p>
+              </div>
             </div>
           ))}
         </div>
