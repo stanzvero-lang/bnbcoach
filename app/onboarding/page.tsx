@@ -117,7 +117,7 @@ export default function OnboardingPage() {
       });
 
       if (error) throw error;
-      router.push("/");
+      router.push("/dashboard");
     } catch (err) {
       console.error("Errore salvataggio profilo:", err);
     } finally {

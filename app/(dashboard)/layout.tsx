@@ -6,7 +6,7 @@ import { Home, Search, Camera, CheckSquare, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/analyze", label: "Analizza", icon: Search },
   { href: "/photos", label: "Foto", icon: Camera },
   { href: "/tasks", label: "Task", icon: CheckSquare },
@@ -38,7 +38,7 @@ export default function DashboardLayout({
           {navItems.map((item) => {
             const isActive =
               pathname === item.href ||
-              (item.href !== "/" && pathname.startsWith(item.href));
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
             const Icon = item.icon;
 
             return (
