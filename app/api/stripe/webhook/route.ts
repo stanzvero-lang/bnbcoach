@@ -3,20 +3,27 @@ import { getStripe } from "@/lib/stripe";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
 
-const NOT_CONFIGURED = NextResponse.json(
-  { error: "Webhook non ancora configurato. Configura le API key di Stripe nelle variabili d'ambiente." },
-  { status: 503 }
-);
+function notConfigured() {
+  return NextResponse.json(
+    { error: "Webhook non ancora configurato. Configura le API key di Stripe nelle variabili d'ambiente." },
+    { status: 503 }
+  );
+}
 
 export async function POST(request: NextRequest) {
   const stripe = getStripe();
-  if (!stripe || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
-    return NOT_CONFIGURED;
+  if (
+    !stripe ||
+    !process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    !process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    !process.env.STRIPE_WEBHOOK_SECRET
+  ) {
+    return notConfigured();
   }
 
   // Use service role key for webhooks (no user context)
   const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
   );
 
