@@ -1,0 +1,50 @@
+const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN;
+const ACTOR_ID = "dtrungtin/airbnb-scraper";
+
+interface ApifyRunResponse {
+  data: {
+    id: string;
+    defaultDatasetId: string;
+    status: string;
+  };
+}
+
+export async function scrapeAirbnbListing(url: string) {
+  const response = await fetch(
+    `https://api.apify.com/v2/acts/${ACTOR_ID}/runs?token=${APIFY_API_TOKEN}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        startUrls: [{ url }],
+        maxListings: 1,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to start Apify scraper");
+  }
+
+  const run: ApifyRunResponse = await response.json();
+  const datasetId = run.data.defaultDatasetId;
+
+  // Wait for the run to finish (polling)
+  let status = run.data.status;
+  while (status === "RUNNING" || status === "READY") {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const statusRes = await fetch(
+      `https://api.apify.com/v2/actor-runs/${run.data.id}?token=${APIFY_API_TOKEN}`
+    );
+    const statusData = await statusRes.json();
+    status = statusData.data.status;
+  }
+
+  // Fetch results
+  const datasetRes = await fetch(
+    `https://api.apify.com/v2/datasets/${datasetId}/items?token=${APIFY_API_TOKEN}`
+  );
+  const items = await datasetRes.json();
+
+  return items[0] || null;
+}
