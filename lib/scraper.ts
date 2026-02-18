@@ -40,28 +40,35 @@ export async function scrapeAirbnbListing(url: string): Promise<ListingData | nu
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runApifyActor(token: string, listingUrl: string): Promise<any | null> {
+  const input = { urls: [listingUrl] };
+
   // 1. Start the actor run
   const startUrl = `https://api.apify.com/v2/acts/${ACTOR_ID}/runs`;
+  console.log(`[Apify] Starting actor ${ACTOR_ID}`);
+  console.log(`[Apify] POST ${startUrl}`);
+  console.log(`[Apify] Input: ${JSON.stringify(input)}`);
+
   const startRes = await fetch(startUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      urls: [listingUrl],
-    }),
+    body: JSON.stringify(input),
   });
 
   if (!startRes.ok) {
     const body = await startRes.text().catch(() => "");
-    console.error(`Apify start run failed [${startRes.status}]:`, body.slice(0, 500));
-    throw new Error(`Failed to start Apify scraper: ${startRes.status}`);
+    console.error(`[Apify] Start run FAILED [${startRes.status} ${startRes.statusText}]`);
+    console.error(`[Apify] Response headers:`, Object.fromEntries(startRes.headers.entries()));
+    console.error(`[Apify] Response body:`, body);
+    throw new Error(`Failed to start Apify scraper: ${startRes.status} - ${body}`);
   }
 
   const run: ApifyRunResponse = await startRes.json();
   const runId = run.data.id;
   const datasetId = run.data.defaultDatasetId;
+  console.log(`[Apify] Run started: id=${runId}, dataset=${datasetId}, status=${run.data.status}`);
 
   // 2. Poll until the run finishes
   let status = run.data.status;
@@ -76,17 +83,31 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
     );
     if (!pollRes.ok) {
       const pollErr = await pollRes.text().catch(() => "");
-      console.error(`Apify poll failed [${pollRes.status}]:`, pollErr.slice(0, 300));
+      console.error(`[Apify] Poll FAILED [${pollRes.status}]:`, pollErr);
       throw new Error(`Failed to poll Apify run: ${pollRes.status}`);
     }
     const pollData = await pollRes.json();
     status = pollData.data.status;
+    console.log(`[Apify] Poll: status=${status}`);
   }
 
   if (status !== "SUCCEEDED") {
-    console.error(`Apify run finished with status: ${status}`);
+    // Fetch run details to get the error message
+    try {
+      const detailRes = await fetch(
+        `https://api.apify.com/v2/actor-runs/${runId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const detail = await detailRes.json();
+      console.error(`[Apify] Run FAILED with status: ${status}`);
+      console.error(`[Apify] Run details:`, JSON.stringify(detail.data, null, 2));
+    } catch {
+      console.error(`[Apify] Run FAILED with status: ${status} (could not fetch details)`);
+    }
     throw new Error(`Apify scraper failed with status: ${status}`);
   }
+
+  console.log(`[Apify] Run succeeded, fetching dataset ${datasetId}`);
 
   // 3. Fetch dataset items
   const dsRes = await fetch(
@@ -95,15 +116,20 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
   );
   if (!dsRes.ok) {
     const dsErr = await dsRes.text().catch(() => "");
-    console.error(`Apify dataset fetch failed [${dsRes.status}]:`, dsErr.slice(0, 300));
+    console.error(`[Apify] Dataset fetch FAILED [${dsRes.status}]:`, dsErr);
     throw new Error(`Failed to fetch Apify dataset: ${dsRes.status}`);
   }
 
   const items = await dsRes.json();
+  console.log(`[Apify] Dataset returned ${Array.isArray(items) ? items.length : 0} items`);
+
   if (!Array.isArray(items) || items.length === 0) {
-    console.error("Apify returned empty dataset");
+    console.error("[Apify] Dataset is empty — no results returned");
     return null;
   }
+
+  // Log raw data keys for debugging field mapping
+  console.log(`[Apify] Item keys: ${Object.keys(items[0]).join(", ")}`);
 
   return items[0];
 }
