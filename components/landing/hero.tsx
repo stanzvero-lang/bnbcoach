@@ -34,7 +34,7 @@ export function LandingHero() {
           </div>
 
           <p className="mt-3 text-sm text-text-secondary">
-            Nessuna carta richiesta &middot; 10 analisi gratuite incluse
+            Nessuna carta richiesta &middot; 20 analisi gratuite incluse
           </p>
         </div>
 
