@@ -40,7 +40,7 @@ export async function scrapeAirbnbListing(url: string): Promise<ListingData | nu
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function runApifyActor(token: string, listingUrl: string): Promise<any | null> {
-  const input = { urls: [listingUrl] };
+  const input = { startUrls: [{ url: listingUrl }] };
 
   // 1. Start the actor run
   const startUrl = `https://api.apify.com/v2/acts/${ACTOR_ID}/runs`;
