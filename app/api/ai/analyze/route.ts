@@ -167,8 +167,8 @@ export async function POST(request: NextRequest) {
       usingMock = true;
     }
 
-    console.log("[Analyze] Listing data (normalized):", JSON.stringify(listingData).slice(0, 1500));
     console.log("[Analyze] Using mock:", usingMock);
+    console.log("[Analyze] FULL LISTING DATA:", JSON.stringify(listingData));
 
     // Build prompt with profile context
     const prompt = buildPrompt(listingData, profile);
@@ -181,12 +181,14 @@ export async function POST(request: NextRequest) {
     });
 
     const content = message.content[0];
+    console.log("[Analyze] CLAUDE RAW RESPONSE:", JSON.stringify(message.content));
     if (content.type !== "text") {
       throw new Error("Unexpected response type");
     }
 
     // Robust JSON extraction
     const jsonStr = extractJSON(content.text);
+    console.log("[Analyze] EXTRACTED JSON STRING:", jsonStr);
     const analysis = JSON.parse(jsonStr);
 
     // Validate required fields
@@ -221,7 +223,7 @@ export async function POST(request: NextRequest) {
 
     const hasPrice = listingData.price.amount !== null && listingData.price.amount > 0;
 
-    return NextResponse.json({
+    const responsePayload = {
       ...analysis,
       listing_summary: {
         title: listingData.title,
@@ -235,7 +237,11 @@ export async function POST(request: NextRequest) {
         propertyType: listingData.propertyType,
       },
       using_mock: usingMock,
-    });
+    };
+
+    console.log("[Analyze] FINAL RESPONSE TO CLIENT:", JSON.stringify(responsePayload));
+
+    return NextResponse.json(responsePayload);
   } catch (error) {
     console.error("Analyze error:", error);
     const message = error instanceof Error ? error.message : "Errore sconosciuto";

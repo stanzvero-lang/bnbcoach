@@ -131,9 +131,9 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
     return null;
   }
 
-  // Log raw data for debugging field mapping and normalization issues
+  // Log full raw data for debugging field mapping and normalization issues
   console.log(`[Apify] Item keys: ${Object.keys(items[0]).join(", ")}`);
-  console.log(`[Apify] Raw response:`, JSON.stringify(items[0]).slice(0, 2000));
+  console.log("[Apify] RAW FULL RESPONSE:", JSON.stringify(items[0]));
 
   return items[0];
 }
