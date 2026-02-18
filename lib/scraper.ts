@@ -156,17 +156,8 @@ function normalizeToListingData(raw: any, originalUrl: string): ListingData {
   const country =
     raw.country || raw.address?.country || raw.countryCode || "Italia";
 
-  // Price
-  let priceAmount = 0;
-  if (typeof raw.price === "number") {
-    priceAmount = raw.price;
-  } else if (raw.price?.rate) {
-    priceAmount = raw.price.rate;
-  } else if (raw.price?.amount) {
-    priceAmount = raw.price.amount;
-  } else if (raw.pricing?.rate?.amount) {
-    priceAmount = raw.pricing.rate.amount;
-  }
+  // Price — may be a number, object, array of nightly prices, or string
+  const priceAmount = extractPrice(raw);
 
   return {
     url: raw.url || originalUrl,
@@ -187,4 +178,66 @@ function normalizeToListingData(raw: any, originalUrl: string): ListingData {
     beds: raw.beds || raw.bedCount || raw.bed_count || 0,
     bathrooms: raw.bathrooms || raw.bathroomCount || raw.bathroom_count || 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Price extraction — handles number, object, array, string, deep scan
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractPrice(raw: any): number | null {
+  // 1. Direct numeric field
+  if (typeof raw.price === "number" && raw.price > 0) return raw.price;
+
+  // 2. Price as object with known sub-fields
+  if (raw.price && typeof raw.price === "object" && !Array.isArray(raw.price)) {
+    const p = raw.price;
+    const candidate = p.rate || p.amount || p.pricePerNight || p.basePrice || p.total;
+    if (typeof candidate === "number" && candidate > 0) return candidate;
+  }
+
+  // 3. Price as array of nightly values → compute average
+  if (Array.isArray(raw.price) && raw.price.length > 0) {
+    const nums = raw.price
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((v: any) => (typeof v === "number" ? v : typeof v === "object" ? (v.rate || v.amount || v.price || 0) : 0))
+      .filter((n: number) => n > 0);
+    if (nums.length > 0) {
+      return Math.round(nums.reduce((a: number, b: number) => a + b, 0) / nums.length);
+    }
+  }
+
+  // 4. Known alternative field names
+  const altFields = [
+    raw.pricing?.rate?.amount,
+    raw.pricing?.amount,
+    raw.pricePerNight,
+    raw.price_per_night,
+    raw.priceRate,
+    raw.price_rate,
+    raw.basePrice,
+    raw.nightlyPrice,
+    raw.nightly_price,
+  ];
+  for (const val of altFields) {
+    if (typeof val === "number" && val > 0) return val;
+  }
+
+  // 5. Price as string like "€85" or "$120 per night"
+  const priceStr = raw.priceString || raw.price_string || raw.priceLabel || raw.price_label
+    || (typeof raw.price === "string" ? raw.price : null);
+  if (priceStr) {
+    const num = parseFloat(String(priceStr).replace(/[^0-9.,]/g, "").replace(",", "."));
+    if (!isNaN(num) && num > 0) return num;
+  }
+
+  // 6. Deep scan: look for any top-level key containing "price" with a numeric value
+  for (const key of Object.keys(raw)) {
+    if (key.toLowerCase().includes("price") && typeof raw[key] === "number" && raw[key] > 0) {
+      return raw[key];
+    }
+  }
+
+  // Nothing found
+  return null;
 }

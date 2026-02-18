@@ -28,7 +28,7 @@ interface AnalysisResult {
   amenities_review: string;
   description_score: number;
   description_review: string;
-  pricing_score: number;
+  pricing_score: number | null;
   pricing_review: string;
   tips: string[];
   listing_summary: ListingSummary;
@@ -260,7 +260,7 @@ export default function AnalyzePage() {
                     {getScoreLabel(result.overall_score)}
                   </p>
                   <p className="text-xs text-text-secondary mt-1">
-                    Media pesata di titolo, foto, descrizione, amenities e prezzo
+                    Media pesata di titolo, foto, descrizione, amenities{result.pricing_score !== null ? " e prezzo" : ""}
                   </p>
                 </div>
               </div>
@@ -271,8 +271,12 @@ export default function AnalyzePage() {
           <div className="space-y-3">
             <h2 className="text-lg font-bold px-1">Dettaglio punteggi</h2>
             {SCORE_AREAS.map((area) => {
-              const score = result[area.scoreField] as number;
+              const score = result[area.scoreField] as number | null;
               const review = result[area.reviewField] as string;
+
+              // Skip pricing area when score is null (price not available)
+              if (score === null || score === undefined) return null;
+
               return (
                 <Card key={area.key}>
                   <CardContent className="p-4">

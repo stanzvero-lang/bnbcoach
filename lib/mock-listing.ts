@@ -8,7 +8,7 @@ export interface ListingData {
   photoCount: number;
   photoCaptions: string[];
   amenities: string[];
-  price: { amount: number; currency: string; period: string };
+  price: { amount: number | null; currency: string; period: string };
   rating: number;
   reviewCount: number;
   reviewSample: string[];

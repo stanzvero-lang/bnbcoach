@@ -18,6 +18,9 @@ function extractJSON(text: string): string {
 }
 
 function buildPrompt(listing: ListingData, profile: { property_type?: string; location_city?: string; guest_target?: string[] } | null): string {
+  const hasPrice = listing.price.amount !== null && listing.price.amount > 0;
+  const priceDisplay = hasPrice ? `€${listing.price.amount}/${listing.price.period}` : "Prezzo non disponibile";
+
   let prompt = `Sei un esperto di ottimizzazione annunci Airbnb con anni di esperienza nel mercato italiano. Analizza questo listing e fornisci una valutazione dettagliata.
 
 ## Dati del listing
@@ -25,7 +28,7 @@ function buildPrompt(listing: ListingData, profile: { property_type?: string; lo
 - **Titolo**: "${listing.title}"
 - **Tipo**: ${listing.propertyType}
 - **Posizione**: ${listing.location.area}, ${listing.location.city}, ${listing.location.country}
-- **Prezzo**: €${listing.price.amount}/${listing.price.period}
+- **Prezzo**: ${priceDisplay}
 - **Numero foto**: ${listing.photoCount}
 - **Didascalie foto**: ${listing.photoCaptions.filter(Boolean).length} su ${listing.photoCount} con didascalia
 - **Rating**: ${listing.rating}/5 (${listing.reviewCount} recensioni)
@@ -60,10 +63,16 @@ Valuta: numero (ideale 20+, ottimo 30+), presenza didascalie, varietà stanze co
 Valuta: completezza (spazio, zona, trasporti, esperienze), struttura (paragrafi, emoji, leggibilità mobile), SEO, call-to-action, tono.
 
 ### Amenities (0-100)
-Valuta: essenziali (WiFi, cucina, lavatrice, AC), comfort (TV, ferro, asciugacapelli), extra (parcheggio, check-in autonomo), competitività zona.
+Valuta: essenziali (WiFi, cucina, lavatrice, AC), comfort (TV, ferro, asciugacapelli), extra (parcheggio, check-in autonomo), competitività zona.`;
+
+  if (hasPrice) {
+    prompt += `
 
 ### Prezzo (0-100)
-Valuta: competitività mercato locale, value perception data la qualità dell'annuncio.
+Valuta: competitività mercato locale, value perception data la qualità dell'annuncio.`;
+  }
+
+  prompt += `
 
 ## Output
 
@@ -78,13 +87,33 @@ Rispondi ESCLUSIVAMENTE con un JSON valido. Nessun testo prima o dopo, nessun ma
   "description_score": <0-100>,
   "description_review": "<commento 1-2 frasi>",
   "amenities_score": <0-100>,
-  "amenities_review": "<commento 1-2 frasi>",
-  "pricing_score": <0-100>,
-  "pricing_review": "<commento 1-2 frasi>",
-  "tips": ["<consiglio 1>", "<consiglio 2>", "<consiglio 3>", "<consiglio 4>", "<consiglio 5>"]
-}
+  "amenities_review": "<commento 1-2 frasi>",`;
 
-overall_score = media pesata: titolo 20%, foto 25%, descrizione 20%, amenities 15%, prezzo 20%.
+  if (hasPrice) {
+    prompt += `
+  "pricing_score": <0-100>,
+  "pricing_review": "<commento 1-2 frasi>",`;
+  } else {
+    prompt += `
+  "pricing_score": null,
+  "pricing_review": "Dato prezzo non disponibile, categoria non valutata.",`;
+  }
+
+  prompt += `
+  "tips": ["<consiglio 1>", "<consiglio 2>", "<consiglio 3>", "<consiglio 4>", "<consiglio 5>"]
+}`;
+
+  if (hasPrice) {
+    prompt += `
+
+overall_score = media pesata: titolo 20%, foto 25%, descrizione 20%, amenities 15%, prezzo 20%.`;
+  } else {
+    prompt += `
+
+Il dato prezzo non è disponibile: NON valutare la categoria prezzo. Calcola overall_score come media pesata SOLO delle 4 categorie disponibili: titolo 25%, foto 30%, descrizione 25%, amenities 20%.`;
+  }
+
+  prompt += `
 Consigli: specifici, azionabili, ordinati per impatto. Scrivi in italiano.`;
 
   return prompt;
@@ -187,12 +216,16 @@ export async function POST(request: NextRequest) {
       console.error("DB save error (non-fatal):", dbError);
     }
 
+    const hasPrice = listingData.price.amount !== null && listingData.price.amount > 0;
+
     return NextResponse.json({
       ...analysis,
       listing_summary: {
         title: listingData.title,
         location: `${listingData.location.area}, ${listingData.location.city}`,
-        price: `€${listingData.price.amount}/${listingData.price.period}`,
+        price: hasPrice
+          ? `€${listingData.price.amount}/${listingData.price.period}`
+          : "Prezzo non disponibile",
         rating: listingData.rating,
         reviewCount: listingData.reviewCount,
         photoCount: listingData.photoCount,
