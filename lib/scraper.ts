@@ -5,8 +5,10 @@ import { type ListingData } from "./mock-listing";
 const ACTOR_ID = "tri_angle~airbnb-rooms-urls-scraper";
 
 // Max time to wait for the Apify run to finish (ms)
-const MAX_POLL_TIME = 120_000;
+const MAX_POLL_TIME = 30_000;
 const POLL_INTERVAL = 3_000;
+// Timeout for individual HTTP requests to Apify API (ms)
+const FETCH_TIMEOUT = 10_000;
 
 interface ApifyRunResponse {
   data: {
@@ -55,6 +57,7 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
       Authorization: `Bearer ${token}`,
     },
     body: JSON.stringify(input),
+    signal: AbortSignal.timeout(FETCH_TIMEOUT),
   });
 
   if (!startRes.ok) {
@@ -79,7 +82,7 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
 
     const pollRes = await fetch(
       `https://api.apify.com/v2/actor-runs/${runId}`,
-      { headers: { Authorization: `Bearer ${token}` } }
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(FETCH_TIMEOUT) }
     );
     if (!pollRes.ok) {
       const pollErr = await pollRes.text().catch(() => "");
@@ -112,7 +115,7 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
   // 3. Fetch dataset items
   const dsRes = await fetch(
     `https://api.apify.com/v2/datasets/${datasetId}/items`,
-    { headers: { Authorization: `Bearer ${token}` } }
+    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(FETCH_TIMEOUT) }
   );
   if (!dsRes.ok) {
     const dsErr = await dsRes.text().catch(() => "");
@@ -128,8 +131,9 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
     return null;
   }
 
-  // Log raw data keys for debugging field mapping
+  // Log raw data for debugging field mapping and normalization issues
   console.log(`[Apify] Item keys: ${Object.keys(items[0]).join(", ")}`);
+  console.log(`[Apify] Raw response:`, JSON.stringify(items[0]).slice(0, 2000));
 
   return items[0];
 }

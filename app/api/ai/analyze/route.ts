@@ -167,6 +167,9 @@ export async function POST(request: NextRequest) {
       usingMock = true;
     }
 
+    console.log("[Analyze] Listing data (normalized):", JSON.stringify(listingData).slice(0, 1500));
+    console.log("[Analyze] Using mock:", usingMock);
+
     // Build prompt with profile context
     const prompt = buildPrompt(listingData, profile);
 
