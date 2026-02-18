@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAnthropic, AI_MODEL } from "@/lib/anthropic";
 import { scrapeAirbnbListing } from "@/lib/scraper";
-import { getMockListingData, type ListingData } from "@/lib/mock-listing";
+import { type ListingData } from "@/lib/mock-listing";
 
 // Extract JSON from a string that may contain markdown code fences or extra text
 function extractJSON(text: string): string {
@@ -120,8 +120,11 @@ Consigli: specifici, azionabili, ordinati per impatto. Scrivi in italiano.`;
 }
 
 export async function POST(request: NextRequest) {
+  console.log("[Analyze] POST handler invoked");
   try {
+    console.log("[Analyze] Initializing Anthropic client...");
     const anthropic = getAnthropic();
+    console.log("[Analyze] Anthropic client OK. Initializing Supabase...");
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
@@ -152,28 +155,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get listing data: scrape directly from Airbnb, fall back to mock data
-    let listingData: ListingData | null = null;
-    let usingMock = false;
-
-    try {
-      listingData = await scrapeAirbnbListing(url);
-    } catch (scrapeErr) {
-      console.error("Scrape failed, falling back to mock data:", scrapeErr);
-    }
-
-    if (!listingData) {
-      listingData = getMockListingData(url);
-      usingMock = true;
-    }
-
-    console.log("[Analyze] Using mock:", usingMock);
+    // Scrape listing data from Airbnb via Apify (no mock fallback)
+    console.log("[Analyze] Calling Apify scraper for URL:", url);
+    const listingData: ListingData = await scrapeAirbnbListing(url);
+    console.log("[Analyze] Apify scrape SUCCESS");
     console.log("[Analyze] FULL LISTING DATA:", JSON.stringify(listingData));
 
     // Build prompt with profile context
     const prompt = buildPrompt(listingData, profile);
 
     // Analyze with Claude
+    console.log("[Analyze] Calling Claude API (model:", AI_MODEL, ")");
     const message = await anthropic.messages.create({
       model: AI_MODEL,
       max_tokens: 2000,
@@ -236,7 +228,6 @@ export async function POST(request: NextRequest) {
         photoCount: listingData.photoCount,
         propertyType: listingData.propertyType,
       },
-      using_mock: usingMock,
     };
 
     console.log("[Analyze] FINAL RESPONSE TO CLIENT:", JSON.stringify(responsePayload));

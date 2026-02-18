@@ -22,16 +22,17 @@ interface ApifyRunResponse {
  * Scrape an Airbnb listing via Apify tri_angle/airbnb-rooms-urls-scraper.
  * Requires APIFY_API_TOKEN env var.
  */
-export async function scrapeAirbnbListing(url: string): Promise<ListingData | null> {
+export async function scrapeAirbnbListing(url: string): Promise<ListingData> {
   const token = process.env.APIFY_API_TOKEN;
   if (!token) {
-    console.error("APIFY_API_TOKEN is not set, skipping scrape");
-    return null;
+    throw new Error("APIFY_API_TOKEN is not set — cannot scrape listing");
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const raw = await runApifyActor(token, url);
-  if (!raw) return null;
+  if (!raw) {
+    throw new Error("Apify returned no data for this listing");
+  }
 
   return normalizeToListingData(raw, url);
 }
