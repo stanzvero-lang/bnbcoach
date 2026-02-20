@@ -23,7 +23,7 @@ export default function SignupPage() {
     setError("");
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -31,22 +31,36 @@ export default function SignupPage() {
         },
       });
 
-      if (error) {
-        setError(error.message);
+      if (signUpError) {
+        setError(signUpError.message);
         return;
       }
 
-      // Create initial profile row so onboarding can upsert into it
-      if (data.user) {
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
+      if (!data.user) {
+        setError("Errore durante la registrazione. Riprova.");
+        return;
+      }
+
+      // Create profile via server-side API (bypasses RLS)
+      const profileRes = await fetch("/api/auth/create-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: data.user.id,
           name,
           email,
-        });
+        }),
+      });
+
+      if (!profileRes.ok) {
+        const body = await profileRes.json().catch(() => ({}));
+        console.error("Profile creation failed:", body);
+        // Don't block — user is created, profile will be created at onboarding
       }
 
       router.push("/onboarding");
-    } catch {
+    } catch (err) {
+      console.error("Signup error:", err);
       setError("Si è verificato un errore. Riprova.");
     } finally {
       setLoading(false);
@@ -54,7 +68,7 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 bg-surface">
+    <main className="min-h-[100dvh] flex items-center justify-center px-5 bg-surface">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
@@ -75,6 +89,7 @@ export default function SignupPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
+                className="min-h-[48px]"
               />
             </div>
             <div>
@@ -88,6 +103,7 @@ export default function SignupPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="min-h-[48px]"
               />
             </div>
             <div>
@@ -102,6 +118,7 @@ export default function SignupPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
+                className="min-h-[48px]"
               />
             </div>
 
@@ -109,7 +126,7 @@ export default function SignupPage() {
               <p className="text-sm text-error">{error}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full min-h-[48px]" disabled={loading}>
               {loading ? "Registrazione in corso..." : "Registrati gratis"}
             </Button>
           </form>
