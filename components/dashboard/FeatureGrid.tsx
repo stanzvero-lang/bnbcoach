@@ -46,6 +46,13 @@ const FEATURES = [
     icon: "\uD83D\uDECB\uFE0F",
     color: "#10B981",
   },
+  {
+    href: "/achievements",
+    label: "Achievement",
+    description: "Badge e traguardi",
+    icon: "\uD83C\uDFC6",
+    color: "#EAB308",
+  },
 ];
 
 export default function FeatureGrid() {
