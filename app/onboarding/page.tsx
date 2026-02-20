@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -47,7 +47,7 @@ const BUDGETS = [
   { icon: "\uD83D\uDCB0", label: "\u20AC1000+", description: "Investimento serio" },
 ];
 
-// Top 50 Italian cities for autocomplete
+// Top 100 Italian cities for autocomplete
 const ITALIAN_CITIES = [
   "Roma", "Milano", "Napoli", "Torino", "Palermo", "Genova", "Bologna",
   "Firenze", "Bari", "Catania", "Venezia", "Verona", "Messina", "Padova",
@@ -56,17 +56,131 @@ const ITALIAN_CITIES = [
   "Rimini", "Salerno", "Ferrara", "Sassari", "Latina", "Giugliano in Campania",
   "Monza", "Siracusa", "Pescara", "Bergamo", "Forlì", "Trento", "Vicenza",
   "Terni", "Bolzano", "Novara", "Piacenza", "Ancona", "Andria", "Arezzo",
-  "Udine", "Cesena", "Lecce",
+  "Udine", "Cesena", "Lecce", "Lucca", "Pesaro", "Alessandria", "Catanzaro",
+  "Pistoia", "Brindisi", "Como", "Treviso", "Varese", "La Spezia", "Pisa",
+  "Busto Arsizio", "Sesto San Giovanni", "Grosseto", "Caserta", "Ragusa",
+  "Asti", "Cremona", "Marsala", "Trapani", "Cosenza", "Potenza", "Massa",
+  "Mantova", "Caltanissetta", "Benevento", "Viterbo", "Avellino", "Lodi",
+  "Matera", "Cuneo", "Teramo", "Pordenone", "Rovigo", "Savona", "Olbia",
+  "Imperia", "Fermo", "Oristano", "Verbania", "Nuoro", "Aosta", "Enna",
+  "Campobasso", "Rieti", "Vibo Valentia", "Isernia", "Crotone", "Sondrio",
+  "Biella",
 ];
 
 // ---------------------------------------------------------------------------
-// Component
+// Isolated CityAutocomplete — manages own state, no parent re-render per keystroke
+// ---------------------------------------------------------------------------
+const CityAutocomplete = memo(function CityAutocomplete({
+  initialCity,
+  onCityCommit,
+}: {
+  initialCity: string;
+  onCityCommit: (city: string) => void;
+}) {
+  const [query, setQuery] = useState(initialCity);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const filtered = query.length >= 2
+    ? ITALIAN_CITIES.filter((c) => c.toLowerCase().startsWith(query.toLowerCase())).slice(0, 8)
+    : [];
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function selectCity(city: string) {
+    setQuery(city);
+    setShowSuggestions(false);
+    onCityCommit(city);
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <label className="text-sm font-medium mb-1.5 block">Città</label>
+      <Input
+        placeholder="Inizia a scrivere la città..."
+        value={query}
+        onChange={(e) => {
+          const val = e.target.value;
+          setQuery(val);
+          setShowSuggestions(val.length >= 2);
+        }}
+        onBlur={() => {
+          // Delay to allow click on suggestion before blur hides dropdown
+          setTimeout(() => {
+            onCityCommit(query);
+          }, 200);
+        }}
+        onFocus={() => {
+          if (query.length >= 2) setShowSuggestions(true);
+        }}
+        className="min-h-[48px]"
+        autoComplete="off"
+      />
+      {showSuggestions && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-border rounded-xl shadow-soft overflow-hidden max-h-[240px] overflow-y-auto">
+          {filtered.map((city) => (
+            <button
+              key={city}
+              type="button"
+              onMouseDown={(e) => {
+                // Prevent input blur from firing before click
+                e.preventDefault();
+                selectCity(city);
+              }}
+              className="w-full text-left px-4 py-3 text-sm hover:bg-surface transition-colors border-b border-border last:border-b-0"
+            >
+              {city}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Isolated AreaInput — same pattern, local state
+// ---------------------------------------------------------------------------
+const AreaInput = memo(function AreaInput({
+  initialArea,
+  onAreaCommit,
+}: {
+  initialArea: string;
+  onAreaCommit: (area: string) => void;
+}) {
+  const [value, setValue] = useState(initialArea);
+
+  return (
+    <div>
+      <label className="text-sm font-medium mb-1.5 block">Quartiere / Zona (opzionale)</label>
+      <Input
+        placeholder="es. Centro, Trastevere, Navigli..."
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => onAreaCommit(value)}
+        className="min-h-[48px]"
+      />
+    </div>
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Main component
 // ---------------------------------------------------------------------------
 export default function OnboardingPage() {
   const [slide, setSlide] = useState(0);
-  const [, setSaving] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [error, setError] = useState("");
+  const [, setSaving] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     has_listing: false,
     airbnb_url: "",
@@ -77,30 +191,10 @@ export default function OnboardingPage() {
     improvement_budget: "",
   });
 
-  // City autocomplete state
-  const [cityQuery, setCityQuery] = useState("");
-  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
-  const cityRef = useRef<HTMLDivElement>(null);
-
   const router = useRouter();
   const supabase = createClient();
 
-  const progress = ((slide) / (TOTAL_SLIDES - 2)) * 100; // slides 1-5 mapped to 0-100
-
-  const filteredCities = cityQuery.length >= 1
-    ? ITALIAN_CITIES.filter((c) => c.toLowerCase().startsWith(cityQuery.toLowerCase())).slice(0, 8)
-    : [];
-
-  // Close city dropdown on outside click
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (cityRef.current && !cityRef.current.contains(e.target as Node)) {
-        setShowCitySuggestions(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  const progress = ((slide) / (TOTAL_SLIDES - 2)) * 100;
 
   function canProceed(): boolean {
     switch (slide) {
@@ -127,18 +221,22 @@ export default function OnboardingPage() {
     }
   }
 
-  function selectCity(city: string) {
+  // Stable callbacks for child components
+  const onCityCommit = useCallback((city: string) => {
     setData((p) => ({ ...p, location_city: city }));
-    setCityQuery(city);
-    setShowCitySuggestions(false);
-  }
+  }, []);
 
-  // Slide 6: auto-save and optionally trigger analysis
+  const onAreaCommit = useCallback((area: string) => {
+    setData((p) => ({ ...p, location_area: area }));
+  }, []);
+
+  // Slide 6: auto-save via server-side API and optionally trigger analysis
   const saveAndRedirect = useCallback(async (cancelled: { current: boolean }) => {
     setSaving(true);
     setError("");
 
     try {
+      // First check user is still logged in
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         setError("Sessione scaduta. Effettua di nuovo il login.");
@@ -146,20 +244,25 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Save profile
-      const { error: saveError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        has_listing: data.has_listing,
-        property_type: data.property_type,
-        location_city: data.location_city,
-        location_area: data.location_area,
-        guest_target: data.guest_target,
-        improvement_budget: data.improvement_budget,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
+      // Save via server-side API (bypasses RLS)
+      const res = await fetch("/api/auth/save-onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          has_listing: data.has_listing,
+          property_type: data.property_type,
+          location_city: data.location_city,
+          location_area: data.location_area,
+          guest_target: data.guest_target,
+          improvement_budget: data.improvement_budget,
+        }),
       });
 
-      if (saveError) throw saveError;
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        console.error("Save onboarding failed:", body);
+        throw new Error(body.error || "Salvataggio fallito");
+      }
 
       // Animate progress bar
       for (let i = 0; i <= 100; i += 5) {
@@ -184,7 +287,8 @@ export default function OnboardingPage() {
     } catch (err) {
       if (!cancelled.current) {
         console.error("Errore salvataggio profilo:", err);
-        setError("Errore durante il salvataggio. Riprova.");
+        const msg = err instanceof Error ? err.message : "Errore durante il salvataggio. Riprova.";
+        setError(msg);
         setSaving(false);
       }
     }
@@ -197,39 +301,6 @@ export default function OnboardingPage() {
     saveAndRedirect(cancelled);
     return () => { cancelled.current = true; };
   }, [slide, saveAndRedirect]);
-
-  // ---------------------------------------------------------------------------
-  // Shared wrappers
-  // ---------------------------------------------------------------------------
-  const SlideWrapper = ({ children }: { children: React.ReactNode }) => (
-    <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
-      {children}
-    </div>
-  );
-
-  const NavButtons = ({ backLabel = "Indietro", nextLabel = "Avanti", nextDisabled = false, onNext = handleNext }: {
-    backLabel?: string;
-    nextLabel?: string;
-    nextDisabled?: boolean;
-    onNext?: () => void;
-  }) => (
-    <div className="flex gap-3 pt-6">
-      <Button
-        variant="outline"
-        onClick={handleBack}
-        className="flex-1 min-h-[48px] text-base"
-      >
-        {backLabel}
-      </Button>
-      <Button
-        onClick={onNext}
-        disabled={nextDisabled}
-        className="flex-1 min-h-[48px] text-base"
-      >
-        {nextLabel}
-      </Button>
-    </div>
-  );
 
   // ---------------------------------------------------------------------------
   // Render
@@ -248,7 +319,7 @@ export default function OnboardingPage() {
 
       {/* ==================== SLIDE 0: Welcome ==================== */}
       {slide === 0 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center space-y-6">
             <span className="text-7xl block">{"\uD83C\uDFE0"}</span>
             <h1 className="text-[28px] font-bold text-dark leading-tight">
@@ -265,12 +336,12 @@ export default function OnboardingPage() {
               Iniziamo &rarr;
             </Button>
           </div>
-        </SlideWrapper>
+        </div>
       )}
 
       {/* ==================== SLIDE 1: Has listing? ==================== */}
       {slide === 1 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center mb-4">
             <span className="text-5xl block mb-3">{"\uD83D\uDD0D"}</span>
             <h1 className="text-2xl font-bold text-dark">Hai già un annuncio?</h1>
@@ -326,13 +397,20 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          <NavButtons nextDisabled={!canProceed()} />
-        </SlideWrapper>
+          <div className="flex gap-3 pt-6">
+            <Button variant="outline" onClick={handleBack} className="flex-1 min-h-[48px] text-base">
+              Indietro
+            </Button>
+            <Button onClick={handleNext} disabled={!canProceed()} className="flex-1 min-h-[48px] text-base">
+              Avanti
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ==================== SLIDE 2: Property type ==================== */}
       {slide === 2 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center mb-4">
             <span className="text-5xl block mb-3">{"\uD83C\uDFE0"}</span>
             <h1 className="text-2xl font-bold text-dark">Tipo di proprietà</h1>
@@ -364,13 +442,20 @@ export default function OnboardingPage() {
             ))}
           </div>
 
-          <NavButtons nextDisabled={!canProceed()} />
-        </SlideWrapper>
+          <div className="flex gap-3 pt-6">
+            <Button variant="outline" onClick={handleBack} className="flex-1 min-h-[48px] text-base">
+              Indietro
+            </Button>
+            <Button onClick={handleNext} disabled={!canProceed()} className="flex-1 min-h-[48px] text-base">
+              Avanti
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ==================== SLIDE 3: Location ==================== */}
       {slide === 3 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center mb-4">
             <span className="text-5xl block mb-3">{"\uD83D\uDCCD"}</span>
             <h1 className="text-2xl font-bold text-dark">Dove si trova?</h1>
@@ -380,59 +465,30 @@ export default function OnboardingPage() {
           </div>
 
           <div className="space-y-4">
-            {/* City with autocomplete */}
-            <div ref={cityRef} className="relative">
-              <label className="text-sm font-medium mb-1.5 block">Città</label>
-              <Input
-                placeholder="Inizia a scrivere la città..."
-                value={cityQuery}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setCityQuery(val);
-                  setData((p) => ({ ...p, location_city: val }));
-                  setShowCitySuggestions(val.length >= 1);
-                }}
-                onFocus={() => {
-                  if (cityQuery.length >= 1) setShowCitySuggestions(true);
-                }}
-                className="min-h-[48px]"
-                autoComplete="off"
-              />
-              {showCitySuggestions && filteredCities.length > 0 && (
-                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-border rounded-xl shadow-soft overflow-hidden max-h-[240px] overflow-y-auto">
-                  {filteredCities.map((city) => (
-                    <button
-                      key={city}
-                      type="button"
-                      onClick={() => selectCity(city)}
-                      className="w-full text-left px-4 py-3 text-sm hover:bg-surface transition-colors border-b border-border-light last:border-b-0"
-                    >
-                      {city}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Area/Quartiere — shown always but especially useful after city selected */}
-            <div>
-              <label className="text-sm font-medium mb-1.5 block">Quartiere / Zona (opzionale)</label>
-              <Input
-                placeholder="es. Centro, Trastevere, Navigli..."
-                value={data.location_area}
-                onChange={(e) => setData((p) => ({ ...p, location_area: e.target.value }))}
-                className="min-h-[48px]"
-              />
-            </div>
+            <CityAutocomplete
+              initialCity={data.location_city}
+              onCityCommit={onCityCommit}
+            />
+            <AreaInput
+              initialArea={data.location_area}
+              onAreaCommit={onAreaCommit}
+            />
           </div>
 
-          <NavButtons nextDisabled={!canProceed()} />
-        </SlideWrapper>
+          <div className="flex gap-3 pt-6">
+            <Button variant="outline" onClick={handleBack} className="flex-1 min-h-[48px] text-base">
+              Indietro
+            </Button>
+            <Button onClick={handleNext} disabled={!canProceed()} className="flex-1 min-h-[48px] text-base">
+              Avanti
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ==================== SLIDE 4: Guest target ==================== */}
       {slide === 4 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center mb-4">
             <span className="text-5xl block mb-3">{"\uD83D\uDC65"}</span>
             <h1 className="text-2xl font-bold text-dark">Chi vuoi ospitare?</h1>
@@ -474,13 +530,20 @@ export default function OnboardingPage() {
             })}
           </div>
 
-          <NavButtons nextDisabled={!canProceed()} />
-        </SlideWrapper>
+          <div className="flex gap-3 pt-6">
+            <Button variant="outline" onClick={handleBack} className="flex-1 min-h-[48px] text-base">
+              Indietro
+            </Button>
+            <Button onClick={handleNext} disabled={!canProceed()} className="flex-1 min-h-[48px] text-base">
+              Avanti
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ==================== SLIDE 5: Budget ==================== */}
       {slide === 5 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center mb-4">
             <span className="text-5xl block mb-3">{"\uD83D\uDCB0"}</span>
             <h1 className="text-2xl font-bold text-dark">Budget per miglioramenti</h1>
@@ -517,16 +580,20 @@ export default function OnboardingPage() {
             Molti miglioramenti sono gratis!
           </p>
 
-          <NavButtons
-            nextLabel="Completa \uD83C\uDF89"
-            nextDisabled={!canProceed()}
-          />
-        </SlideWrapper>
+          <div className="flex gap-3 pt-6">
+            <Button variant="outline" onClick={handleBack} className="flex-1 min-h-[48px] text-base">
+              Indietro
+            </Button>
+            <Button onClick={handleNext} disabled={!canProceed()} className="flex-1 min-h-[48px] text-base">
+              Completa {"\uD83C\uDF89"}
+            </Button>
+          </div>
+        </div>
       )}
 
       {/* ==================== SLIDE 6: Loading ==================== */}
       {slide === 6 && (
-        <SlideWrapper>
+        <div className="flex flex-col justify-center flex-1 w-full max-w-lg mx-auto py-6">
           <div className="text-center space-y-8">
             <span className="text-7xl block animate-bounce">
               {data.has_listing && data.airbnb_url ? "\uD83D\uDD0D" : "\uD83D\uDE80"}
@@ -551,14 +618,14 @@ export default function OnboardingPage() {
                 <Button
                   variant="outline"
                   className="min-h-[48px]"
-                  onClick={() => { setSlide(5); setSaving(false); }}
+                  onClick={() => { setSlide(5); setSaving(false); setAnalysisProgress(0); }}
                 >
                   Riprova
                 </Button>
               </div>
             )}
           </div>
-        </SlideWrapper>
+        </div>
       )}
     </main>
   );
