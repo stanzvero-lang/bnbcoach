@@ -58,7 +58,7 @@ export default function AnalyzePage() {
     setResult(null);
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
+    const timeout = setTimeout(() => controller.abort(), 90_000);
 
     try {
       const res = await fetch("/api/ai/analyze", {
@@ -236,6 +236,16 @@ export default function AnalyzePage() {
   );
 }
 
+// Safely coerce a value to a number, returning fallback if not a finite number
+function safeNumber(val: unknown, fallback: number = 0): number {
+  if (typeof val === "number" && Number.isFinite(val)) return val;
+  if (typeof val === "string") {
+    const n = parseFloat(val);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+
 // Extracted as a separate component so ErrorBoundary can catch render errors
 function AnalysisResults({
   result,
@@ -252,9 +262,9 @@ function AnalysisResults({
   getScoreLabel: (s: number) => string;
   onReset: () => void;
 }) {
-  const overallScore = result.overall_score ?? 0;
-  const tips = result.tips ?? [];
-  const summary = result.listing_summary;
+  const overallScore = safeNumber(result.overall_score);
+  const tips = Array.isArray(result.tips) ? result.tips.filter((t): t is string => typeof t === "string") : [];
+  const summary = result.listing_summary || {} as Partial<ListingSummary>;
 
   return (
     <div className="space-y-4">
@@ -285,8 +295,8 @@ function AnalysisResults({
                 </p>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-xs text-text-secondary">
                   <span>{"\uD83D\uDCB0"} {summary.price || "N/A"}</span>
-                  <span>{"\u2B50"} {summary.rating ?? 0}/5 ({summary.reviewCount ?? 0} recensioni)</span>
-                  <span>{"\uD83D\uDCF8"} {summary.photoCount ?? 0} foto</span>
+                  <span>{"\u2B50"} {safeNumber(summary.rating)}/5 ({safeNumber(summary.reviewCount)} recensioni)</span>
+                  <span>{"\uD83D\uDCF8"} {safeNumber(summary.photoCount)} foto</span>
                 </div>
               </div>
             </div>
@@ -340,11 +350,13 @@ function AnalysisResults({
       <div className="space-y-3">
         <h2 className="text-lg font-bold px-1">Dettaglio punteggi</h2>
         {SCORE_AREAS.map((area) => {
-          const score = result[area.scoreField] as number | null;
-          const review = result[area.reviewField] as string;
+          const rawScore = result[area.scoreField];
+          const review = (result[area.reviewField] as string) || "";
 
-          // Skip pricing area when score is null (price not available)
-          if (score === null || score === undefined) return null;
+          // Skip pricing area when score is null/undefined (price not available)
+          if (rawScore === null || rawScore === undefined) return null;
+
+          const score = safeNumber(rawScore);
 
           return (
             <Card key={area.key}>

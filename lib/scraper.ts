@@ -143,6 +143,54 @@ async function runApifyActor(token: string, listingUrl: string): Promise<any | n
 // Normalize Apify response → ListingData
 // ---------------------------------------------------------------------------
 
+// Parse room details from subDescription.items like ['2 guests', '1 bedroom', '2 beds', '1 bath']
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseSubDescription(raw: any): { guests: number; bedrooms: number; beds: number; bathrooms: number } {
+  const result = { guests: 0, bedrooms: 0, beds: 0, bathrooms: 0 };
+  const items: string[] = raw.subDescription?.items || raw.subDescription || [];
+  if (!Array.isArray(items)) return result;
+
+  for (const item of items) {
+    if (typeof item !== "string") continue;
+    const lower = item.toLowerCase();
+    const num = parseInt(item.match(/\d+/)?.[0] || "0", 10);
+    if (lower.includes("guest") || lower.includes("ospit")) result.guests = num;
+    else if (lower.includes("bedroom") || lower.includes("camer")) result.bedrooms = num;
+    else if (lower.includes("bed") || lower.includes("lett")) result.beds = num;
+    else if (lower.includes("bath") || lower.includes("bagn")) result.bathrooms = num;
+  }
+  return result;
+}
+
+// Extract individual amenity names from Apify's nested amenity structure.
+// Apify may return: array of strings, array of { title, items: [...] } categories,
+// or array of { name } / { title } objects.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractAmenities(raw: any): string[] {
+  const rawAmenities = raw.amenities || [];
+  if (!Array.isArray(rawAmenities)) return [];
+
+  const amenities: string[] = [];
+  for (const a of rawAmenities) {
+    if (typeof a === "string") {
+      amenities.push(a);
+    } else if (a && typeof a === "object") {
+      // If it's a category with nested items, extract each item
+      if (Array.isArray(a.items)) {
+        for (const item of a.items) {
+          const name = typeof item === "string" ? item : (item?.title || item?.name || "");
+          if (name) amenities.push(name);
+        }
+      } else {
+        // Simple object with name/title
+        const name = a.name || a.title || a.tag || "";
+        if (name) amenities.push(name);
+      }
+    }
+  }
+  return amenities;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeToListingData(raw: any, originalUrl: string): ListingData {
   // Photos / images — may be array of strings or objects with url/caption
@@ -156,11 +204,8 @@ function normalizeToListingData(raw: any, originalUrl: string): ListingData {
   const description =
     raw.description || raw.detailDescription || raw.sectioned_description?.description || "";
 
-  // Amenities — may be array of strings or objects
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const amenities: string[] = (raw.amenities || []).map((a: any) =>
-    typeof a === "string" ? a : (a.name || a.title || a.tag || "")
-  ).filter(Boolean);
+  // Amenities — extract individual items, not categories
+  const amenities = extractAmenities(raw);
 
   // Reviews
   const reviewSample: string[] = [];
@@ -170,25 +215,67 @@ function normalizeToListingData(raw: any, originalUrl: string): ListingData {
     if (text) reviewSample.push(text);
   }
 
-  // Host
+  // Host — responseRate may be on host object or top-level as string like "100%"
   const hostObj = raw.host || {};
   const hostName =
     hostObj.name || hostObj.hostName || hostObj.firstName || hostObj.first_name || raw.hostName || "";
   const isSuperhost =
     hostObj.isSuperhost || hostObj.isSuperHost || hostObj.is_superhost || raw.isSuperhost || false;
   const responseRate =
-    hostObj.responseRate || hostObj.response_rate || "N/A";
+    hostObj.responseRate || hostObj.response_rate
+    || raw.responseRate || raw.response_rate || "N/A";
 
-  // Location
+  // Location — try location object, locationSubtitle, locationTitle, address
+  const locationObj = raw.location || {};
   const city =
-    raw.city || raw.address?.city || raw.locationTitle?.split(",")[0]?.trim() || "";
+    locationObj.city
+    || raw.city
+    || raw.address?.city
+    // locationSubtitle often has "City, Country" format
+    || raw.locationSubtitle?.split(",")[0]?.trim()
+    || raw.locationTitle?.split(",")[0]?.trim()
+    || "";
   const area =
-    raw.neighborhood || raw.address?.neighborhood || "";
+    locationObj.area || locationObj.neighborhood
+    || raw.neighborhood || raw.address?.neighborhood || "";
   const country =
-    raw.country || raw.address?.country || raw.countryCode || "Italia";
+    locationObj.country
+    || raw.country
+    || raw.address?.country
+    || raw.locationSubtitle?.split(",").pop()?.trim()
+    || raw.countryCode
+    || "";
 
   // Price — may be a number, object, array of nightly prices, or string
   const priceAmount = extractPrice(raw);
+
+  // Rating — may be nested in a rating object or top-level
+  const ratingObj = raw.rating && typeof raw.rating === "object" ? raw.rating : null;
+  const ratingValue = ratingObj
+    ? (ratingObj.value || ratingObj.accuracy || ratingObj.overall || 0)
+    : (raw.stars || raw.rating || raw.star_rating || raw.guestSatisfactionOverall || 0);
+
+  // Review count — may be inside rating object as reviewsCount
+  const reviewCount = ratingObj?.reviewsCount
+    || ratingObj?.reviewCount
+    || ratingObj?.numberOfReviews
+    || raw.reviewsCount
+    || raw.numberOfReviews
+    || raw.reviews_count
+    || raw.reviewCount
+    || 0;
+
+  // Room details — first try subDescription.items, then fall back to top-level fields
+  const subDesc = parseSubDescription(raw);
+
+  const guests = subDesc.guests
+    || raw.numberOfGuests || raw.personCapacity || raw.guestCount || raw.person_capacity || 0;
+  const bedrooms = subDesc.bedrooms
+    || raw.bedrooms || raw.bedroomCount || raw.bedroom_count || 0;
+  const beds = subDesc.beds
+    || raw.beds || raw.bedCount || raw.bed_count || 0;
+  const bathrooms = subDesc.bathrooms
+    || raw.bathrooms || raw.bathroomCount || raw.bathroom_count || 0;
 
   return {
     url: raw.url || originalUrl,
@@ -198,16 +285,16 @@ function normalizeToListingData(raw: any, originalUrl: string): ListingData {
     photoCaptions,
     amenities,
     price: { amount: priceAmount, currency: "EUR", period: "notte" },
-    rating: raw.stars || raw.rating || raw.star_rating || raw.guestSatisfactionOverall || 0,
-    reviewCount: raw.reviewsCount || raw.numberOfReviews || raw.reviews_count || raw.reviewCount || 0,
+    rating: ratingValue,
+    reviewCount,
     reviewSample,
     propertyType: raw.roomType || raw.propertyType || raw.room_type || "",
     location: { city, area, country },
     host: { name: hostName, superhost: isSuperhost, responseRate },
-    guests: raw.numberOfGuests || raw.personCapacity || raw.guestCount || raw.person_capacity || 0,
-    bedrooms: raw.bedrooms || raw.bedroomCount || raw.bedroom_count || 0,
-    beds: raw.beds || raw.bedCount || raw.bed_count || 0,
-    bathrooms: raw.bathrooms || raw.bathroomCount || raw.bathroom_count || 0,
+    guests,
+    bedrooms,
+    beds,
+    bathrooms,
   };
 }
 

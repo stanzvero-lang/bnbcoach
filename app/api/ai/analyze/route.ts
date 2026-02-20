@@ -183,8 +183,21 @@ export async function POST(request: NextRequest) {
     console.log("[Analyze] EXTRACTED JSON STRING:", jsonStr);
     const analysis = JSON.parse(jsonStr);
 
+    // Coerce fields to expected types to prevent frontend crashes
+    if (typeof analysis.overall_score === "string") {
+      analysis.overall_score = parseFloat(analysis.overall_score) || 0;
+    }
+    for (const field of ["title_score", "photos_score", "description_score", "amenities_score", "pricing_score"] as const) {
+      if (typeof analysis[field] === "string") {
+        analysis[field] = parseFloat(analysis[field]) || 0;
+      }
+    }
+    if (!Array.isArray(analysis.tips)) {
+      analysis.tips = [];
+    }
+
     // Validate required fields
-    if (typeof analysis.overall_score !== "number" || !Array.isArray(analysis.tips)) {
+    if (typeof analysis.overall_score !== "number") {
       throw new Error("Invalid analysis response structure");
     }
 
