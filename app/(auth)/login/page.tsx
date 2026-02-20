@@ -35,11 +35,11 @@ export default function LoginPage() {
       // Check if onboarding is completed
       const { data: profile } = await supabase
         .from("profiles")
-        .select("property_type")
+        .select("onboarding_completed")
         .eq("id", data.user.id)
         .single();
 
-      if (profile?.property_type) {
+      if (profile?.onboarding_completed) {
         router.push("/dashboard");
       } else {
         router.push("/onboarding");
