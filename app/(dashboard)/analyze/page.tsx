@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,12 +44,28 @@ const SCORE_AREAS = [
   { key: "pricing", label: "Prezzo", emoji: "\uD83D\uDCB0", scoreField: "pricing_score", reviewField: "pricing_review" },
 ] as const;
 
+interface HistoryItem {
+  id: string;
+  overall_score: number;
+  created_at: string;
+  listings?: { airbnb_url: string; listing_name: string } | null;
+}
+
 export default function AnalyzePage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const errorBoundaryRef = useRef<ErrorBoundary>(null);
+
+  // Fetch analysis history on mount
+  useEffect(() => {
+    fetch("/api/analyses")
+      .then((r) => (r.ok ? r.json() : { analyses: [] }))
+      .then((d) => setHistory(d.analyses || []))
+      .catch(() => {});
+  }, []);
 
   async function handleAnalyze(e: React.FormEvent) {
     e.preventDefault();
@@ -80,6 +96,29 @@ export default function AnalyzePage() {
       }
 
       setResult(data);
+
+      // Persist to DB in background (non-blocking)
+      fetch("/api/analyses/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, analysis: data }),
+      })
+        .then((r) => r.json())
+        .then((saved) => {
+          if (saved.success) {
+            // Prepend to history
+            setHistory((prev) => [
+              {
+                id: saved.analysis_id,
+                overall_score: data.overall_score,
+                created_at: saved.created_at || new Date().toISOString(),
+                listings: { airbnb_url: url, listing_name: data.listing_summary?.title || "" },
+              },
+              ...prev,
+            ]);
+          }
+        })
+        .catch((err) => console.error("Save analysis error:", err));
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         setError("L'analisi ha impiegato troppo tempo. Riprova tra qualche minuto.");
@@ -231,6 +270,60 @@ export default function AnalyzePage() {
         >
           <AnalysisResults result={result} getScoreColor={getScoreColor} getScoreBg={getScoreBg} getScoreBadge={getScoreBadge} getScoreLabel={getScoreLabel} onReset={() => { setResult(null); setUrl(""); }} />
         </ErrorBoundary>
+      )}
+
+      {/* Analysis History */}
+      {!result && !loading && history.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            {"\uD83D\uDCC8"} Storico analisi
+          </h2>
+          {history.map((item, idx) => {
+            const prev = history[idx + 1];
+            const diff = prev ? item.overall_score - prev.overall_score : null;
+            return (
+              <Card key={item.id || idx} className="hover:shadow-soft transition-shadow">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div
+                    className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-white shrink-0",
+                      item.overall_score >= 70
+                        ? "bg-success"
+                        : item.overall_score >= 40
+                        ? "bg-warning"
+                        : "bg-error"
+                    )}
+                  >
+                    {item.overall_score}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {item.listings?.listing_name || item.listings?.airbnb_url || "Analisi"}
+                    </p>
+                    <p className="text-xs text-text-secondary">
+                      {new Date(item.created_at).toLocaleDateString("it-IT", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </p>
+                  </div>
+                  {diff !== null && diff !== 0 && (
+                    <span
+                      className={cn(
+                        "text-sm font-semibold",
+                        diff > 0 ? "text-success" : "text-error"
+                      )}
+                    >
+                      {diff > 0 ? "\u2191+" : "\u2193"}
+                      {diff}
+                    </span>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
     </div>
   );
